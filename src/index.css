@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+body {
+  overflow: hidden;
+  background: #0f172a;
+}
