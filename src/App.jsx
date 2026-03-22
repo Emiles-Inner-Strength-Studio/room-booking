@@ -3,6 +3,7 @@ import { useGoogleCalendar } from './useGoogleCalendar'
 import { useClock } from './useClock'
 import SettingsModal from './SettingsModal'
 import BookingModal from './BookingModal'
+import { MOCK_ROOM_NAME } from './mockData'
 
 const REFRESH_INTERVAL = 60000 // 1 min
 
@@ -35,8 +36,8 @@ export default function App() {
   const gcal = useGoogleCalendar()
   const now = useClock()
   const [events, setEvents] = useState([])
-  const [roomId, setRoomId] = useState(localStorage.getItem('gcal_room_id') || '')
-  const [roomName, setRoomName] = useState(localStorage.getItem('gcal_room_name') || 'Room')
+  const [roomId, setRoomId] = useState(localStorage.getItem('gcal_room_id') || 'mock-room-a')
+  const [roomName, setRoomName] = useState(localStorage.getItem('gcal_room_name') || MOCK_ROOM_NAME)
   const [showSettings, setShowSettings] = useState(false)
   const [showBooking, setShowBooking] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -64,9 +65,14 @@ export default function App() {
     return () => clearInterval(interval)
   }, [loadEvents])
 
-  // Show settings on first load if not configured
+  // Clear partial/invalid credentials on first load
   useEffect(() => {
-    if (!localStorage.getItem('gcal_client_id')) setShowSettings(true)
+    const clientId = localStorage.getItem('gcal_client_id') || ''
+    const apiKey = localStorage.getItem('gcal_api_key') || ''
+    if ((clientId && clientId.length < 10) || (apiKey && apiKey.length < 10)) {
+      localStorage.removeItem('gcal_client_id')
+      localStorage.removeItem('gcal_api_key')
+    }
   }, [])
 
   const handleSecretTap = () => {
@@ -90,6 +96,11 @@ export default function App() {
   const timeRemaining = currentEnd ? currentEnd - now : null
 
   const handleBook = async ({ title, startTime, durationMinutes }) => {
+    // Ensure we have an OAuth token before writing
+    if (!gcal.authed) {
+      const ok = await gcal.signIn()
+      if (!ok) throw new Error('Sign-in required to book')
+    }
     await gcal.bookRoom(roomId, { title, startTime, durationMinutes })
     await loadEvents()
   }
@@ -199,7 +210,9 @@ export default function App() {
       {/* Footer */}
       <div className="px-8 pb-6 flex justify-between items-center">
         <span className="text-slate-600 text-xs">
-          {lastRefresh ? `Updated ${formatTime(lastRefresh)}` : ''}
+          {gcal.isMock
+            ? <span className="text-amber-600/70">● Demo mode — tap ×3 top-right to connect Google Calendar</span>
+            : lastRefresh ? `Updated ${formatTime(lastRefresh)}` : ''}
         </span>
         <button onClick={loadEvents} className="text-slate-600 hover:text-slate-400 text-xs transition-colors">
           Refresh
