@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-export default function SettingsModal({ onClose, onSave, gcal }) {
+export default function SettingsModal({ onClose, onSave, gcal, onRefresh }) {
   const [rooms, setRooms] = useState([])
   const [selectedRoom, setSelectedRoom] = useState(localStorage.getItem('gcal_room_id') || '')
   const [selectedRoomName, setSelectedRoomName] = useState(localStorage.getItem('gcal_room_name') || '')
@@ -38,7 +38,14 @@ export default function SettingsModal({ onClose, onSave, gcal }) {
       <div className="bg-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-6 shadow-2xl">
         <div className="flex justify-between items-center">
           <h2 className="text-white text-xl font-semibold">Settings</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none">×</button>
+          <div className="flex items-center gap-3">
+            {onRefresh && (
+              <button onClick={() => { onRefresh(); onClose() }} className="text-slate-400 hover:text-white text-sm transition-colors">
+                Refresh
+              </button>
+            )}
+            <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none">×</button>
+          </div>
         </div>
 
         {/* Auth status */}

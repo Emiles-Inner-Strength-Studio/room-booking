@@ -5,7 +5,9 @@ import SettingsModal from './SettingsModal'
 import BookingModal from './BookingModal'
 import { MOCK_ROOM_NAME } from './mockData'
 
-const REFRESH_INTERVAL = 60000
+const REFRESH_INTERVAL = 30000
+const POST_BOOK_RAPID_INTERVAL = 1000
+const POST_BOOK_RAPID_DURATION = 15000
 
 function formatTime(date) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -49,6 +51,7 @@ export default function App() {
   const [showBooking, setShowBooking] = useState(false)
   const [loading, setLoading] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(null)
+  const refreshIntervalRef = useRef(null)
 
   const loadEvents = useCallback(async () => {
     if (!gcal.authed || !roomId) return
@@ -63,15 +66,26 @@ export default function App() {
     setLoading(false)
   }, [gcal.authed, roomId, gcal.getTodayEvents])
 
+  const startRefreshCycle = useCallback((rapid = false) => {
+    if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current)
+    if (rapid) {
+      refreshIntervalRef.current = setInterval(loadEvents, POST_BOOK_RAPID_INTERVAL)
+      setTimeout(() => startRefreshCycle(false), POST_BOOK_RAPID_DURATION)
+    } else {
+      refreshIntervalRef.current = setInterval(loadEvents, REFRESH_INTERVAL)
+    }
+  }, [loadEvents])
+
   useEffect(() => {
     loadEvents()
-    const interval = setInterval(loadEvents, REFRESH_INTERVAL)
-    return () => clearInterval(interval)
-  }, [loadEvents])
+    startRefreshCycle(false)
+    return () => clearInterval(refreshIntervalRef.current)
+  }, [loadEvents, startRefreshCycle])
 
   const handleBook = async ({ title, startTime, durationMinutes }) => {
     await gcal.bookRoom(roomId, { title, startTime, durationMinutes })
     await loadEvents()
+    startRefreshCycle(true) // rapid refresh for 15s after booking
   }
 
   const { current, upcoming } = getCurrentAndNext(events, now)
@@ -93,16 +107,7 @@ export default function App() {
             {now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-4xl font-light tabular-nums">{formatTime(now)}</div>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="text-slate-500 hover:text-slate-300 transition-colors p-1"
-            title="Settings"
-          >
-            <GearIcon />
-          </button>
-        </div>
+        <div className="text-4xl font-light tabular-nums">{formatTime(now)}</div>
       </div>
 
       {/* Not signed in */}
@@ -197,12 +202,13 @@ export default function App() {
           </div>
 
           {/* Footer */}
-          <div className="px-8 pb-6 flex justify-between items-center">
-            <span className="text-slate-600 text-xs">
-              {lastRefresh ? `Updated ${formatTime(lastRefresh)}` : ''}
-            </span>
-            <button onClick={loadEvents} className="text-slate-600 hover:text-slate-400 text-xs transition-colors">
-              Refresh
+          <div className="px-8 pb-6 flex justify-end items-center">
+            <button
+              onClick={() => setShowSettings(true)}
+              className="text-slate-600 hover:text-slate-400 transition-colors p-1"
+              title="Settings"
+            >
+              <GearIcon />
             </button>
           </div>
         </>
@@ -214,6 +220,7 @@ export default function App() {
           gcal={gcal}
           onClose={() => setShowSettings(false)}
           onSave={(id, name) => { setRoomId(id); setRoomName(name) }}
+          onRefresh={loadEvents}
         />
       )}
       {showBooking && (
