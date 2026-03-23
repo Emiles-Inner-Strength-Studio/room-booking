@@ -171,12 +171,17 @@ export function useGoogleCalendar() {
     console.log('[gcal] bookRoom token present:', !!token)
     if (!token) throw new Error('Not authenticated — no OAuth token')
     const endTime = new Date(startTime.getTime() + durationMinutes * 60000)
+    // Book on the user's primary calendar, adding the room resource as an attendee.
+    // Google Workspace will automatically reflect the booking on the room's resource calendar.
     const res = await window.gapi.client.calendar.events.insert({
-      calendarId,
+      calendarId: 'primary',
       resource: {
         summary: title,
         start: { dateTime: startTime.toISOString() },
         end:   { dateTime: endTime.toISOString() },
+        attendees: [
+          { email: calendarId, resource: true },
+        ],
       },
     })
     return res.result
