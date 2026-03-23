@@ -227,7 +227,7 @@ export default function App() {
                       <div
                         key={event.id}
                         className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all ${
-                          isNow ? 'bg-red-500/10 border-red-500/30'
+                          isNow ? 'bg-red-500/10 border-red-500/30 sticky top-0 z-10 shadow-lg'
                           : isPast ? 'bg-slate-800/20 border-slate-700/20 opacity-35'
                           : 'bg-slate-800/50 border-slate-700/30'
                         }`}
