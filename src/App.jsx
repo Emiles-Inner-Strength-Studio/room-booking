@@ -156,9 +156,6 @@ export default function App() {
 
             {/* Big status */}
             <div className="flex-1 flex flex-col justify-center">
-              <div className="flex items-center gap-3 mb-4">
-                <div className={`w-4 h-4 rounded-full flex-shrink-0 ${isFree ? 'bg-green-400' : 'bg-red-400 animate-pulse'}`} />
-              </div>
               <div className={`text-7xl font-extrabold tracking-tight leading-none ${isFree ? 'text-green-400' : 'text-red-400'}`}>
                 {isFree ? 'Available' : 'In Use'}
               </div>
