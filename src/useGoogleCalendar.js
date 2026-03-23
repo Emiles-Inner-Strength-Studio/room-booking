@@ -1,7 +1,8 @@
 /**
  * useGoogleCalendar — hook for Google Calendar API access via GAPI + GIS
  *
- * Falls back to mock data when credentials aren't configured.
+ * Persists OAuth token in localStorage so sign-in survives page reloads.
+ * Silently refreshes expired tokens via redirect (no prompt).
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -10,6 +11,7 @@ import { getMockEvents, MOCK_ROOMS } from './mockData'
 const SCOPES = 'https://www.googleapis.com/auth/calendar'
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'
 const REDIRECT_URI = window.location.origin + window.location.pathname
+const TOKEN_KEY = 'gcal_token'
 
 const DEFAULT_API_KEY = 'AIzaSyDP9bt-G0tgBNWGIoxYMV7vNxx-lT3I4JM'
 const DEFAULT_CLIENT_ID = '961612899421-hkrid21kugiikch6lul2kuqo004ekj6p.apps.googleusercontent.com'
@@ -17,13 +19,32 @@ const DEFAULT_CLIENT_ID = '961612899421-hkrid21kugiikch6lul2kuqo004ekj6p.apps.go
 const getClientId = () => localStorage.getItem('gcal_client_id') || DEFAULT_CLIENT_ID
 const getApiKey = () => localStorage.getItem('gcal_api_key') || DEFAULT_API_KEY
 
+function saveToken({ access_token, expires_in }) {
+  const expiry = Date.now() + (Number(expires_in) || 3600) * 1000
+  localStorage.setItem(TOKEN_KEY, JSON.stringify({ access_token, expiry }))
+}
+
+function loadSavedToken() {
+  try {
+    const raw = localStorage.getItem(TOKEN_KEY)
+    if (!raw) return null
+    const { access_token, expiry } = JSON.parse(raw)
+    // Return token if it has more than 5 minutes left
+    if (expiry - Date.now() > 5 * 60 * 1000) return { access_token }
+    return null // expired
+  } catch { return null }
+}
+
+function clearSavedToken() {
+  localStorage.removeItem(TOKEN_KEY)
+}
+
 export function useGoogleCalendar() {
   const [ready, setReady] = useState(false)
   const [authed, setAuthed] = useState(false)
-  const [isMock] = useState(false) // always use real credentials
+  const [isMock] = useState(false)
   const [error, setError] = useState(null)
   const tokenClientRef = useRef(null)
-  const resolveAuthRef = useRef(null)
 
   useEffect(() => {
     const clientId = getClientId()
@@ -42,7 +63,6 @@ export function useGoogleCalendar() {
         await loadScript('https://apis.google.com/js/api.js')
         await loadScript('https://accounts.google.com/gsi/client')
 
-        // Init GAPI client
         await new Promise((resolve, reject) => {
           window.gapi.load('client', async () => {
             try {
@@ -52,44 +72,33 @@ export function useGoogleCalendar() {
           })
         })
 
-        // Init GIS code client (redirect flow — no popup)
-        tokenClientRef.current = window.google.accounts.oauth2.initCodeClient({
-          client_id: clientId,
-          scope: SCOPES,
-          ux_mode: 'redirect',
-          redirect_uri: REDIRECT_URI,
-          state: 'gcal_auth',
-        })
-
-        // Check if we're returning from an OAuth redirect
-        // GIS redirect flow returns an auth code in the URL — exchange it for a token
-        // For implicit/token flow we use a different approach: store token in sessionStorage
-        // Actually for pure browser use, use token flow with redirect instead
         tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
           client_id: clientId,
           scope: SCOPES,
           ux_mode: 'redirect',
           redirect_uri: REDIRECT_URI,
-          callback: (resp) => {
-            if (resp.error) {
-              setError(resp.error)
-              resolveAuthRef.current?.(false)
-              return
-            }
-            setAuthed(true)
-            resolveAuthRef.current?.(true)
-          },
         })
 
-        // Handle return from OAuth redirect — token is in URL hash
+        // Check if returning from OAuth redirect (token in URL hash)
         const hash = new URLSearchParams(window.location.hash.slice(1))
         const accessToken = hash.get('access_token')
+        const expiresIn = hash.get('expires_in')
         if (accessToken) {
           window.gapi.client.setToken({ access_token: accessToken })
+          saveToken({ access_token: accessToken, expires_in: Number(expiresIn) || 3600 })
           setAuthed(true)
-          // Clean the token from the URL
           window.history.replaceState(null, '', window.location.pathname)
-          console.log('[gcal] token restored from redirect')
+          console.log('[gcal] signed in via redirect')
+        } else {
+          // Try restoring a saved token
+          const saved = loadSavedToken()
+          if (saved) {
+            window.gapi.client.setToken({ access_token: saved.access_token })
+            setAuthed(true)
+            console.log('[gcal] token restored from storage')
+          } else {
+            console.log('[gcal] no saved token — sign-in required')
+          }
         }
 
         setReady(true)
@@ -104,22 +113,22 @@ export function useGoogleCalendar() {
   }, [])
 
   const signIn = useCallback(() => {
-    // Already have a token in memory
+    // If we have a valid in-memory token, no need to redirect
     const existing = window.gapi?.client?.getToken()
     if (existing?.access_token) return Promise.resolve(true)
     if (!tokenClientRef.current) return Promise.resolve(false)
-    // Redirect flow — this will navigate away and back
+    // Redirect to Google — will return to this page with token in hash
     tokenClientRef.current.requestAccessToken({ prompt: '' })
-    // Returns a never-resolving promise since we're redirecting
-    return new Promise(() => {})
+    return new Promise(() => {}) // never resolves — page navigates away
   }, [])
 
   const signOut = useCallback(() => {
     const token = window.gapi?.client?.getToken()
-    if (token) {
+    if (token?.access_token) {
       window.google.accounts.oauth2.revoke(token.access_token)
       window.gapi.client.setToken('')
     }
+    clearSavedToken()
     setAuthed(false)
   }, [])
 
@@ -149,13 +158,11 @@ export function useGoogleCalendar() {
       console.log('[mock] Booked:', { title, startTime, durationMinutes })
       return { id: `mock-booked-${Date.now()}`, summary: title }
     }
-    // Ensure we have an OAuth token
     if (!window.gapi?.client?.getToken()?.access_token) {
-      const ok = await new Promise((resolve) => {
-        resolveAuthRef.current = resolve
+      await new Promise((resolve) => {
         tokenClientRef.current?.requestAccessToken({ prompt: '' })
+        // Will redirect — won't actually reach resolve
       })
-      if (!ok) throw new Error('Sign-in required to book')
     }
     const endTime = new Date(startTime.getTime() + durationMinutes * 60000)
     const res = await window.gapi.client.calendar.events.insert({
