@@ -164,7 +164,7 @@ export default function App() {
         <div className="flex-1 flex overflow-hidden">
 
           {/* LEFT — Availability */}
-          <div className={`w-2/3 flex flex-col p-8 border-r border-slate-800 ${isFree ? 'bg-green-500/5' : 'bg-red-500/5'}`}>
+          <div className={`w-2/3 flex flex-col p-8 border-r border-slate-800 ${isFree ? 'bg-green-500/15' : 'bg-red-500/15'}`}>
 
             {/* Big status */}
             <div className="flex-1 flex flex-col justify-center space-y-3">
