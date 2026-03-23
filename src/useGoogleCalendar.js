@@ -19,6 +19,16 @@ const DEFAULT_CLIENT_ID = '961612899421-hkrid21kugiikch6lul2kuqo004ekj6p.apps.go
 const getClientId = () => localStorage.getItem('gcal_client_id') || DEFAULT_CLIENT_ID
 const getApiKey = () => localStorage.getItem('gcal_api_key') || DEFAULT_API_KEY
 
+let refreshTimer = null
+
+function scheduleRefresh(expiresIn, refreshFn) {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  // Refresh 5 minutes before expiry (or immediately if already close)
+  const delay = Math.max((Number(expiresIn) - 300) * 1000, 10000)
+  console.log(`[gcal] token refresh scheduled in ${Math.round(delay / 60000)}m`)
+  refreshTimer = setTimeout(refreshFn, delay)
+}
+
 function saveToken({ access_token, expires_in }) {
   const expiry = Date.now() + (Number(expires_in) || 3600) * 1000
   localStorage.setItem(TOKEN_KEY, JSON.stringify({ access_token, expiry }))
@@ -72,15 +82,29 @@ export function useGoogleCalendar() {
           })
         })
 
+        const silentRefresh = () => {
+          console.log('[gcal] attempting silent token refresh...')
+          tokenClientRef.current?.requestAccessToken({ prompt: '' })
+        }
+
         tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
           client_id: clientId,
           scope: SCOPES,
           callback: (resp) => {
-            if (resp.error) { setError(resp.error); return }
+            if (resp.error) {
+              console.warn('[gcal] token refresh failed:', resp.error)
+              // Only clear authed if it's not just a transient error
+              if (resp.error === 'interaction_required' || resp.error === 'login_required') {
+                setAuthed(false)
+                clearSavedToken()
+              }
+              return
+            }
             window.gapi.client.setToken({ access_token: resp.access_token })
             saveToken({ access_token: resp.access_token, expires_in: resp.expires_in })
             setAuthed(true)
-            console.log('[gcal] signed in via popup')
+            scheduleRefresh(resp.expires_in, silentRefresh)
+            console.log('[gcal] token refreshed, expires in', resp.expires_in, 's')
           },
         })
 
@@ -89,7 +113,10 @@ export function useGoogleCalendar() {
         if (saved) {
           window.gapi.client.setToken({ access_token: saved.access_token })
           setAuthed(true)
-          console.log('[gcal] token restored from storage')
+          // Schedule refresh based on remaining time
+          const remaining = Math.max((saved.expiry - Date.now()) / 1000, 0)
+          scheduleRefresh(remaining, silentRefresh)
+          console.log('[gcal] token restored from storage,', Math.round(remaining / 60), 'min remaining')
         } else {
           console.log('[gcal] no saved token — sign-in required')
         }
