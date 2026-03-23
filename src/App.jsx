@@ -246,9 +246,7 @@ export default function App() {
 
             {/* Footer */}
             <div className="px-8 py-5 border-t border-slate-800 flex justify-between items-center">
-              <span className="text-slate-700 text-xs">
-                {lastRefresh ? `Updated ${formatTime(lastRefresh)}` : ''}
-              </span>
+              <img src="/andromeda-submark.svg" alt="Andromeda" className="h-7 opacity-20 invert" />
               <div className="flex items-center gap-4">
                 <button onClick={() => setShowHelp(true)} className="text-slate-600 hover:text-slate-400 transition-colors p-1" title="Help">
                   <HelpIcon />
