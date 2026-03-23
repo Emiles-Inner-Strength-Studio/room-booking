@@ -2,7 +2,6 @@
  * useGoogleCalendar — hook for Google Calendar API access via GAPI + GIS
  *
  * Falls back to mock data when credentials aren't configured.
- * Remove mockData imports when going live with real credentials.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -14,135 +13,89 @@ const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/
 const DEFAULT_API_KEY = 'AIzaSyDP9bt-G0tgBNWGIoxYMV7vNxx-lT3I4JM'
 const DEFAULT_CLIENT_ID = '961612899421-hkrid21kugiikch6lul2kuqo004ekj6p.apps.googleusercontent.com'
 
-function hasValidCredentials() {
-  const clientId = localStorage.getItem('gcal_client_id') || DEFAULT_CLIENT_ID
-  const apiKey = localStorage.getItem('gcal_api_key') || DEFAULT_API_KEY
-  return clientId.length > 10 && apiKey.length > 10
-}
+const getClientId = () => localStorage.getItem('gcal_client_id') || DEFAULT_CLIENT_ID
+const getApiKey = () => localStorage.getItem('gcal_api_key') || DEFAULT_API_KEY
 
 export function useGoogleCalendar() {
-  const credentialsPresent = hasValidCredentials()
   const [ready, setReady] = useState(false)
   const [authed, setAuthed] = useState(false)
+  const [isMock] = useState(false) // always use real credentials
   const [error, setError] = useState(null)
-  const [isMock, setIsMock] = useState(!credentialsPresent)
   const tokenClientRef = useRef(null)
   const resolveAuthRef = useRef(null)
 
-  // --- Mock mode ---
   useEffect(() => {
-    if (!credentialsPresent) {
-      setIsMock(true)
-      setReady(true)
-      setAuthed(true)
-    }
-  }, [credentialsPresent])
-
-  // --- Real mode: Init GAPI + GIS ---
-  useEffect(() => {
-    if (!credentialsPresent) return
-
-    const clientId = localStorage.getItem('gcal_client_id') || DEFAULT_CLIENT_ID
-    const apiKey = localStorage.getItem('gcal_api_key') || DEFAULT_API_KEY
-
-    const initGapi = () => new Promise((resolve, reject) => {
-      window.gapi.load('client', async () => {
-        try {
-          await window.gapi.client.init({ apiKey, discoveryDocs: [DISCOVERY_DOC] })
-          resolve()
-        } catch (e) {
-          reject(e)
-        }
-      })
-    })
-
-    const initGis = () => {
-      tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
-        scope: SCOPES,
-        callback: (resp) => {
-          if (resp.error) {
-            setError(resp.error)
-            resolveAuthRef.current?.(false)
-            return
-          }
-          // Persist token expiry so we know when to refresh
-          localStorage.setItem('gcal_token_expiry', Date.now() + (resp.expires_in * 1000))
-          setAuthed(true)
-          resolveAuthRef.current?.(true)
-        },
-      })
-    }
-
-    const init = async () => {
-      try {
-        console.log('[gcal] initialising with clientId:', clientId.slice(0, 20) + '...')
-        await initGapi()
-        console.log('[gcal] GAPI ready')
-        initGis()
-        console.log('[gcal] GIS ready')
-        setIsMock(false)
-        setReady(true)
-        // Try silent token refresh on load (no prompt)
-        tokenClientRef.current.requestAccessToken({ prompt: '' })
-        if (window.gapi.client.getToken()) setAuthed(true)
-      } catch (e) {
-        console.warn('[gcal] init failed, falling back to mock:', e)
-        setIsMock(true)
-        setReady(true)
-        setAuthed(true)
-        setError('Google API init failed — running in demo mode')
-      }
-    }
+    const clientId = getClientId()
+    const apiKey = getApiKey()
 
     const loadScript = (src) => new Promise((resolve, reject) => {
       if (document.querySelector(`script[src="${src}"]`)) { resolve(); return }
       const s = document.createElement('script')
-      s.src = src
-      s.async = true
-      s.onload = resolve
-      s.onerror = reject
+      s.src = src; s.async = true
+      s.onload = resolve; s.onerror = reject
       document.head.appendChild(s)
     })
 
-    const waitForScripts = async () => {
+    const init = async () => {
       try {
         await loadScript('https://apis.google.com/js/api.js')
         await loadScript('https://accounts.google.com/gsi/client')
-        init()
-      } catch (e) {
-        console.warn('Failed to load Google scripts, falling back to mock:', e)
-        setIsMock(true)
+
+        // Init GAPI client
+        await new Promise((resolve, reject) => {
+          window.gapi.load('client', async () => {
+            try {
+              await window.gapi.client.init({ apiKey, discoveryDocs: [DISCOVERY_DOC] })
+              resolve()
+            } catch (e) { reject(e) }
+          })
+        })
+
+        // Init GIS token client
+        tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: SCOPES,
+          callback: (resp) => {
+            if (resp.error) {
+              setError(resp.error)
+              resolveAuthRef.current?.(false)
+              return
+            }
+            setAuthed(true)
+            resolveAuthRef.current?.(true)
+          },
+        })
+
         setReady(true)
-        setAuthed(true)
+        console.log('[gcal] ready')
+      } catch (e) {
+        console.error('[gcal] init failed:', e)
+        setError('Google API init failed')
       }
     }
 
-    waitForScripts()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    init()
+  }, [])
 
   const signIn = useCallback(() => {
-    if (isMock) return Promise.resolve(true)
-    // If we already have a valid token, resolve immediately
+    // Already have a token in memory
     const existing = window.gapi?.client?.getToken()
     if (existing?.access_token) return Promise.resolve(true)
     return new Promise((resolve) => {
       resolveAuthRef.current = resolve
       if (!tokenClientRef.current) { resolve(false); return }
-      // Always use consent prompt to ensure we get a fresh token
-      tokenClientRef.current.requestAccessToken({ prompt: 'consent' })
+      tokenClientRef.current.requestAccessToken({ prompt: '' })
     })
-  }, [isMock])
+  }, [])
 
   const signOut = useCallback(() => {
-    if (isMock) return
-    const token = window.gapi.client.getToken()
+    const token = window.gapi?.client?.getToken()
     if (token) {
       window.google.accounts.oauth2.revoke(token.access_token)
       window.gapi.client.setToken('')
     }
     setAuthed(false)
-  }, [isMock])
+  }, [])
 
   const listRooms = useCallback(async () => {
     if (isMock) return MOCK_ROOMS
@@ -170,21 +123,22 @@ export function useGoogleCalendar() {
       console.log('[mock] Booked:', { title, startTime, durationMinutes })
       return { id: `mock-booked-${Date.now()}`, summary: title }
     }
-    const token = window.gapi.client.getToken()
-    console.log('[gcal] bookRoom token present:', !!token)
-    if (!token) throw new Error('Not authenticated — no OAuth token')
+    // Ensure we have an OAuth token
+    if (!window.gapi?.client?.getToken()?.access_token) {
+      const ok = await new Promise((resolve) => {
+        resolveAuthRef.current = resolve
+        tokenClientRef.current?.requestAccessToken({ prompt: '' })
+      })
+      if (!ok) throw new Error('Sign-in required to book')
+    }
     const endTime = new Date(startTime.getTime() + durationMinutes * 60000)
-    // Book on the user's primary calendar, adding the room resource as an attendee.
-    // Google Workspace will automatically reflect the booking on the room's resource calendar.
     const res = await window.gapi.client.calendar.events.insert({
       calendarId: 'primary',
       resource: {
         summary: title,
         start: { dateTime: startTime.toISOString() },
         end:   { dateTime: endTime.toISOString() },
-        attendees: [
-          { email: calendarId, resource: true },
-        ],
+        attendees: [{ email: calendarId, resource: true }],
       },
     })
     return res.result

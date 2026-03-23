@@ -47,7 +47,11 @@ export default function App() {
   const tapTimerRef = useRef(null)
 
   const loadEvents = useCallback(async () => {
-    if (!gcal.authed || !roomId) return
+    if (!roomId) return
+    // Auto sign-in if needed before loading events
+    if (!gcal.authed) {
+      await gcal.signIn()
+    }
     setLoading(true)
     try {
       const items = await gcal.getTodayEvents(roomId)
@@ -57,7 +61,7 @@ export default function App() {
       console.error('Failed to load events', e)
     }
     setLoading(false)
-  }, [gcal.authed, roomId, gcal.getTodayEvents])
+  }, [gcal.authed, roomId, gcal.getTodayEvents, gcal.signIn])
 
   useEffect(() => {
     loadEvents()
