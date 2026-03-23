@@ -174,7 +174,7 @@ export default function App() {
                   </>
                 ) : (
                   <>
-                    <p className="text-white text-4xl font-bold mt-2">{effectiveCurrent.summary}</p>
+                    <p className="text-white text-6xl font-bold mt-2 leading-tight">{effectiveCurrent.summary}</p>
                     {effectiveCurrent._optimistic ? (
                       <p className="text-slate-400 text-xl mt-2">Just booked</p>
                     ) : (
