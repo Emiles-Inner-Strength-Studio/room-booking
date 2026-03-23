@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useGoogleCalendar } from './useGoogleCalendar'
 import { useClock } from './useClock'
 import SettingsModal from './SettingsModal'
