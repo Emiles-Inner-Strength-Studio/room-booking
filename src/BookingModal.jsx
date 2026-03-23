@@ -1,84 +1,135 @@
 import { useState } from 'react'
 
-const DURATIONS = [15, 30, 45, 60, 90, 120]
+const DURATIONS = [
+  { label: '15m', minutes: 15 },
+  { label: '30m', minutes: 30 },
+  { label: '45m', minutes: 45 },
+  { label: '1h',  minutes: 60 },
+  { label: '1.5h', minutes: 90 },
+  { label: '2h',  minutes: 120 },
+]
 
 export default function BookingModal({ onClose, onConfirm, startTime }) {
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState('Instant Meeting')
   const [duration, setDuration] = useState(30)
+  const [customMinutes, setCustomMinutes] = useState('')
+  const [showCustom, setShowCustom] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  const effectiveDuration = showCustom
+    ? (parseInt(customMinutes) || 0)
+    : duration
+
+  const endTime = new Date(startTime.getTime() + effectiveDuration * 60000)
+
+  const fmt = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
   const handleConfirm = async () => {
-    if (!title.trim()) return
+    if (!title.trim() || effectiveDuration < 5) return
     setLoading(true)
     setError(null)
     try {
-      await onConfirm({ title: title.trim(), startTime, durationMinutes: duration })
+      await onConfirm({ title: title.trim(), startTime, durationMinutes: effectiveDuration })
       onClose()
     } catch (e) {
-      setError(e.message || 'Booking failed')
+      setError(e.message || 'Booking failed — please try again')
     }
     setLoading(false)
   }
 
-  const endTime = new Date(startTime.getTime() + duration * 60000)
-  const fmt = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end justify-center p-6">
-      <div className="bg-slate-800 rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
-        <h2 className="text-white text-xl font-semibold">Book This Room</h2>
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+      <div className="bg-slate-800 rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden">
 
-        <div className="text-slate-300 text-sm">
-          Starting now · {fmt(startTime)} → {fmt(endTime)}
+        {/* Header */}
+        <div className="px-8 pt-8 pb-6 border-b border-slate-700">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-white text-3xl font-bold">Book This Room</h2>
+              <p className="text-slate-400 text-base mt-1">
+                {fmt(startTime)} → {fmt(endTime)} · {effectiveDuration}m
+              </p>
+            </div>
+            <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center">×</button>
+          </div>
         </div>
 
-        {/* Title */}
-        <div>
-          <label className="text-slate-400 text-sm mb-1 block">Meeting name</label>
-          <input
-            autoFocus
-            className="w-full bg-slate-700 text-white rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleConfirm()}
-            placeholder="e.g. Team standup"
-          />
-        </div>
+        <div className="px-8 py-6 space-y-6">
+          {/* Title */}
+          <div>
+            <label className="text-slate-400 text-sm font-medium uppercase tracking-wide mb-2 block">Meeting name</label>
+            <input
+              autoFocus
+              className="w-full bg-slate-700 text-white rounded-2xl px-5 py-4 text-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleConfirm()}
+              placeholder="Meeting name"
+            />
+          </div>
 
-        {/* Duration */}
-        <div>
-          <label className="text-slate-400 text-sm mb-2 block">Duration</label>
-          <div className="grid grid-cols-3 gap-2">
-            {DURATIONS.map(d => (
+          {/* Duration */}
+          <div>
+            <label className="text-slate-400 text-sm font-medium uppercase tracking-wide mb-3 block">Duration</label>
+            <div className="grid grid-cols-3 gap-3">
+              {DURATIONS.map(d => (
+                <button
+                  key={d.minutes}
+                  onClick={() => { setDuration(d.minutes); setShowCustom(false) }}
+                  className={`py-4 rounded-2xl text-lg font-semibold transition-colors ${
+                    !showCustom && duration === d.minutes
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  {d.label}
+                </button>
+              ))}
               <button
-                key={d}
-                onClick={() => setDuration(d)}
-                className={`py-2 rounded-xl text-sm font-medium transition-colors ${
-                  duration === d
+                onClick={() => setShowCustom(true)}
+                className={`py-4 rounded-2xl text-lg font-semibold transition-colors col-span-3 ${
+                  showCustom
                     ? 'bg-blue-600 text-white'
                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                 }`}
               >
-                {d < 60 ? `${d}m` : `${d / 60}h`}
+                Custom
               </button>
-            ))}
+            </div>
+
+            {showCustom && (
+              <div className="mt-3 flex items-center gap-3">
+                <input
+                  autoFocus
+                  type="number"
+                  min="5"
+                  max="480"
+                  className="flex-1 bg-slate-700 text-white rounded-2xl px-5 py-4 text-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                  value={customMinutes}
+                  onChange={e => setCustomMinutes(e.target.value)}
+                  placeholder="60"
+                />
+                <span className="text-slate-400 text-lg">minutes</span>
+              </div>
+            )}
           </div>
+
+          {error && <p className="text-red-400 text-base">{error}</p>}
         </div>
 
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-
-        <div className="flex gap-3 pt-1">
+        {/* Actions */}
+        <div className="px-8 pb-8 flex gap-4">
           <button
             onClick={onClose}
-            className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl py-3 font-medium transition-colors"
+            className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-5 text-xl font-semibold transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
-            disabled={!title.trim() || loading}
-            className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-xl py-3 font-medium transition-colors"
+            disabled={!title.trim() || effectiveDuration < 5 || loading}
+            className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-2xl py-5 text-xl font-bold transition-colors"
           >
             {loading ? 'Booking...' : 'Confirm'}
           </button>

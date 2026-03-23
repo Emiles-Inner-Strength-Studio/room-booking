@@ -174,13 +174,13 @@ export default function App() {
                   </>
                 ) : (
                   <>
-                    <p className="text-white text-2xl font-semibold">{effectiveCurrent.summary}</p>
+                    <p className="text-white text-4xl font-bold mt-2">{effectiveCurrent.summary}</p>
                     {effectiveCurrent._optimistic ? (
-                      <p className="text-slate-400 text-lg">Just booked</p>
+                      <p className="text-slate-400 text-xl mt-2">Just booked</p>
                     ) : (
                       <>
-                        <p className="text-slate-400 text-lg">Until {formatTime(currentEnd)}</p>
-                        <p className="text-slate-500 text-base">{formatDuration(timeRemaining)} remaining</p>
+                        <p className="text-slate-400 text-xl mt-2">Until {formatTime(currentEnd)}</p>
+                        <p className="text-slate-500 text-lg">{formatDuration(timeRemaining)} remaining</p>
                       </>
                     )}
                   </>
