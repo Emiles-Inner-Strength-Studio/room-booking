@@ -63,7 +63,7 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false)
   const [loading, setLoading] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(null)
-  const [optimisticInUse, setOptimisticInUse] = useState(null) // { title, until }
+  const [optimisticInUse, setOptimisticInUse] = useState(null)
   const refreshIntervalRef = useRef(null)
 
   const loadEvents = useCallback(async () => {
@@ -96,23 +96,18 @@ export default function App() {
   }, [loadEvents, startRefreshCycle])
 
   const handleBook = async ({ title, startTime, durationMinutes }) => {
-    // Optimistic UI: show as in use immediately
     const until = new Date(startTime.getTime() + OPTIMISTIC_IN_USE_DURATION)
     setOptimisticInUse({ title, until })
     setTimeout(() => setOptimisticInUse(null), OPTIMISTIC_IN_USE_DURATION)
-
     await gcal.bookRoom(roomId, { title, startTime, durationMinutes })
     await loadEvents()
     startRefreshCycle(true)
   }
 
   const { current, upcoming } = getCurrentAndNext(events, now)
-
-  // Apply optimistic override
   const effectiveCurrent = optimisticInUse && now < optimisticInUse.until
-    ? { summary: optimisticInUse.title, end: { dateTime: new Date(now.getTime() + 60000 * 30).toISOString() }, _optimistic: true }
+    ? { summary: optimisticInUse.title, _optimistic: true }
     : current
-
   const isFree = !effectiveCurrent
   const nextEvent = upcoming[0]
   const nextStart = nextEvent ? new Date(nextEvent.start.dateTime || nextEvent.start.date) : null
@@ -126,14 +121,14 @@ export default function App() {
     <div className="h-screen w-screen flex flex-col bg-slate-900 text-white overflow-hidden">
 
       {/* Header */}
-      <div className="flex items-start justify-between px-8 pt-8 pb-2">
+      <div className="flex items-center justify-between px-8 pt-7 pb-4 border-b border-slate-800">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight leading-tight">{roomName || 'Room Booking'}</h1>
-          <p className="text-slate-400 text-base mt-1">
+          <h1 className="text-3xl font-bold tracking-tight">{roomName || 'Room Booking'}</h1>
+          <p className="text-slate-500 text-sm mt-0.5">
             {now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        <div className="text-5xl font-light tabular-nums pt-1">{formatTime(now)}</div>
+        <div className="text-4xl font-light tabular-nums text-slate-200">{formatTime(now)}</div>
       </div>
 
       {/* Not signed in */}
@@ -153,136 +148,131 @@ export default function App() {
           {gcal.error && <p className="text-red-400 text-base">{gcal.error}</p>}
         </div>
       ) : (
-        <>
-          {/* Status banner — big and bold */}
-          <div className={`mx-6 mt-4 rounded-3xl transition-colors ${
-            isFree
-              ? 'bg-green-500/20 border-2 border-green-500/50'
-              : 'bg-red-500/20 border-2 border-red-500/50'
-          }`}>
-            <div className="flex items-center justify-between px-8 py-8">
-              <div className="space-y-2">
-                <div className={`text-5xl font-extrabold tracking-tight ${isFree ? 'text-green-400' : 'text-red-400'}`}>
-                  {isFree ? '● Available' : '● In Use'}
-                </div>
+        /* Two-column layout */
+        <div className="flex-1 flex overflow-hidden">
+
+          {/* LEFT — Availability */}
+          <div className={`w-1/2 flex flex-col p-8 border-r border-slate-800 ${isFree ? 'bg-green-500/5' : 'bg-red-500/5'}`}>
+
+            {/* Big status */}
+            <div className="flex-1 flex flex-col justify-center">
+              <div className={`text-7xl font-extrabold tracking-tight leading-none ${isFree ? 'text-green-400' : 'text-red-400'}`}>
+                {isFree ? 'Available' : 'In Use'}
+              </div>
+              <div className={`mt-3 text-3xl font-semibold ${isFree ? 'text-green-500/70' : 'text-red-500/70'}`}>
+                {isFree ? '●' : '●'}
+              </div>
+
+              <div className="mt-6 space-y-1">
                 {isFree ? (
-                  <p className="text-slate-300 text-xl">
-                    {nextStart
-                      ? `Free until ${formatTime(nextStart)} · ${formatDuration(timeUntilNext)}`
-                      : 'Free for the rest of the day'}
-                  </p>
+                  <>
+                    <p className="text-slate-300 text-xl">
+                      {nextStart
+                        ? `Free until ${formatTime(nextStart)}`
+                        : 'Free for the rest of the day'}
+                    </p>
+                    {timeUntilNext && (
+                      <p className="text-slate-500 text-lg">{formatDuration(timeUntilNext)} from now</p>
+                    )}
+                  </>
                 ) : (
-                  <div className="space-y-1">
+                  <>
                     <p className="text-white text-2xl font-semibold">{effectiveCurrent.summary}</p>
                     {effectiveCurrent._optimistic ? (
                       <p className="text-slate-400 text-lg">Just booked</p>
                     ) : (
-                      <p className="text-slate-400 text-lg">
-                        Ends {formatTime(currentEnd)} · {formatDuration(timeRemaining)} remaining
-                      </p>
+                      <>
+                        <p className="text-slate-400 text-lg">Until {formatTime(currentEnd)}</p>
+                        <p className="text-slate-500 text-base">{formatDuration(timeRemaining)} remaining</p>
+                      </>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
-              {isFree && (
-                <button
-                  onClick={() => setShowBooking(true)}
-                  className="bg-green-500 hover:bg-green-400 active:bg-green-600 text-white font-bold px-10 py-6 rounded-2xl text-2xl transition-colors shadow-xl flex-shrink-0"
-                >
-                  Book Now
-                </button>
-              )}
             </div>
-          </div>
 
-          {/* Today's schedule */}
-          <div className="flex-1 overflow-y-auto px-6 mt-6">
-            <h2 className="text-slate-500 text-xs font-semibold uppercase tracking-widest mb-3 px-2">Today's Schedule</h2>
-            {loading && events.length === 0 ? (
-              <div className="text-slate-500 text-base text-center py-10">Loading...</div>
-            ) : events.length === 0 ? (
-              <div className="text-slate-500 text-base text-center py-10">
-                {roomId ? 'No meetings today' : 'Select a room in Settings ⚙️'}
-              </div>
-            ) : (
-              <div className="space-y-2 pb-4">
-                {events.map(event => {
-                  const start = new Date(event.start.dateTime || event.start.date)
-                  const end = new Date(event.end.dateTime || event.end.date)
-                  const isPast = end < now
-                  const isNow = start <= now && end > now
-                  return (
-                    <div
-                      key={event.id}
-                      className={`flex items-center gap-5 px-5 py-4 rounded-2xl border transition-all ${
-                        isNow ? 'bg-red-500/10 border-red-500/30'
-                        : isPast ? 'bg-slate-800/20 border-slate-700/20 opacity-35'
-                        : 'bg-slate-800/50 border-slate-700/30'
-                      }`}
-                    >
-                      <div className="text-right min-w-[5rem]">
-                        <div className={`text-base font-semibold ${isNow ? 'text-red-300' : 'text-slate-300'}`}>{formatTime(start)}</div>
-                        <div className="text-sm text-slate-500">{formatTime(end)}</div>
-                      </div>
-                      <div className={`w-0.5 h-12 rounded-full ${isNow ? 'bg-red-500' : 'bg-slate-600'}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-lg font-medium truncate ${isNow ? 'text-white' : 'text-slate-200'}`}>{event.summary}</div>
-                        <div className="text-sm text-slate-500 mt-0.5">{formatDuration(end - start)}</div>
-                      </div>
-                      {isNow && <div className="w-3 h-3 rounded-full bg-red-400 animate-pulse flex-shrink-0" />}
-                    </div>
-                  )
-                })}
-              </div>
+            {/* Book Now */}
+            {isFree && (
+              <button
+                onClick={() => setShowBooking(true)}
+                className="w-full bg-green-500 hover:bg-green-400 active:bg-green-600 text-white font-bold py-6 rounded-2xl text-2xl transition-colors shadow-xl mt-6"
+              >
+                Book Now
+              </button>
             )}
           </div>
 
-          {/* Footer toolbar */}
-          <div className="px-8 pb-8 pt-2 flex justify-between items-center">
-            <span className="text-slate-700 text-xs">
-              {lastRefresh ? `Updated ${formatTime(lastRefresh)}` : ''}
-            </span>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setShowHelp(true)}
-                className="text-slate-600 hover:text-slate-400 transition-colors p-1"
-                title="Help"
-              >
-                <HelpIcon />
-              </button>
-              <button
-                onClick={() => setShowSettings(true)}
-                className="text-slate-600 hover:text-slate-400 transition-colors p-1"
-                title="Settings"
-              >
-                <GearIcon />
-              </button>
+          {/* RIGHT — Schedule */}
+          <div className="w-1/2 flex flex-col overflow-hidden">
+            <div className="px-8 pt-7 pb-3">
+              <h2 className="text-slate-500 text-xs font-semibold uppercase tracking-widest">Today's Schedule</h2>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 pb-4">
+              {loading && events.length === 0 ? (
+                <div className="text-slate-500 text-base text-center py-10">Loading...</div>
+              ) : events.length === 0 ? (
+                <div className="text-slate-500 text-base text-center py-10">
+                  {roomId ? 'No meetings today' : 'Select a room in Settings ⚙️'}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {events.map(event => {
+                    const start = new Date(event.start.dateTime || event.start.date)
+                    const end = new Date(event.end.dateTime || event.end.date)
+                    const isPast = end < now
+                    const isNow = start <= now && end > now
+                    return (
+                      <div
+                        key={event.id}
+                        className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all ${
+                          isNow ? 'bg-red-500/10 border-red-500/30'
+                          : isPast ? 'bg-slate-800/20 border-slate-700/20 opacity-35'
+                          : 'bg-slate-800/50 border-slate-700/30'
+                        }`}
+                      >
+                        <div className="text-right min-w-[4.5rem]">
+                          <div className={`text-sm font-semibold ${isNow ? 'text-red-300' : 'text-slate-300'}`}>{formatTime(start)}</div>
+                          <div className="text-xs text-slate-500">{formatTime(end)}</div>
+                        </div>
+                        <div className={`w-0.5 h-10 rounded-full flex-shrink-0 ${isNow ? 'bg-red-500' : 'bg-slate-600'}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-base font-medium truncate ${isNow ? 'text-white' : 'text-slate-200'}`}>{event.summary}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">{formatDuration(end - start)}</div>
+                        </div>
+                        {isNow && <div className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-8 py-5 border-t border-slate-800 flex justify-between items-center">
+              <span className="text-slate-700 text-xs">
+                {lastRefresh ? `Updated ${formatTime(lastRefresh)}` : ''}
+              </span>
+              <div className="flex items-center gap-4">
+                <button onClick={() => setShowHelp(true)} className="text-slate-600 hover:text-slate-400 transition-colors p-1" title="Help">
+                  <HelpIcon />
+                </button>
+                <button onClick={() => setShowSettings(true)} className="text-slate-600 hover:text-slate-400 transition-colors p-1" title="Settings">
+                  <GearIcon />
+                </button>
+              </div>
             </div>
           </div>
-        </>
+        </div>
       )}
 
-      {/* Modals */}
       {showSettings && (
-        <SettingsModal
-          gcal={gcal}
-          onClose={() => setShowSettings(false)}
-          onSave={(id, name) => { setRoomId(id); setRoomName(name) }}
-          onRefresh={loadEvents}
-        />
+        <SettingsModal gcal={gcal} onClose={() => setShowSettings(false)} onSave={(id, name) => { setRoomId(id); setRoomName(name) }} onRefresh={loadEvents} />
       )}
       {showBooking && (
-        <BookingModal
-          startTime={now}
-          onClose={() => setShowBooking(false)}
-          onConfirm={handleBook}
-        />
+        <BookingModal startTime={now} onClose={() => setShowBooking(false)} onConfirm={handleBook} />
       )}
       {showHelp && (
-        <HelpModal
-          roomName={roomName}
-          onClose={() => setShowHelp(false)}
-        />
+        <HelpModal roomName={roomName} onClose={() => setShowHelp(false)} />
       )}
     </div>
   )
