@@ -122,11 +122,15 @@ export default function App() {
 
       {/* Header */}
       <div className="flex items-center justify-between px-8 pt-7 pb-4 border-b border-slate-800">
-        <div>
+        <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold tracking-tight">{roomName || 'Room Booking'}</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
-            {now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
-          </p>
+          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+            isFree
+              ? 'bg-green-500/20 text-green-400 border border-green-500/40'
+              : 'bg-red-500/20 text-red-400 border border-red-500/40'
+          }`}>
+            {isFree ? 'Available' : 'In Use'}
+          </span>
         </div>
         <div className="text-4xl font-light tabular-nums text-slate-200">{formatTime(now)}</div>
       </div>
@@ -155,37 +159,30 @@ export default function App() {
           <div className={`w-2/3 flex flex-col p-8 border-r border-slate-800 ${isFree ? 'bg-green-500/5' : 'bg-red-500/5'}`}>
 
             {/* Big status */}
-            <div className="flex-1 flex flex-col justify-center">
-              <div className={`text-7xl font-extrabold tracking-tight leading-none ${isFree ? 'text-green-400' : 'text-red-400'}`}>
-                {isFree ? 'Available' : 'In Use'}
-              </div>
-
-              <div className="mt-6 space-y-1">
-                {isFree ? (
-                  <>
-                    <p className="text-slate-300 text-xl">
-                      {nextStart
-                        ? `Free until ${formatTime(nextStart)}`
-                        : 'Free for the rest of the day'}
-                    </p>
-                    {timeUntilNext && (
-                      <p className="text-slate-500 text-lg">{formatDuration(timeUntilNext)} from now</p>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <p className="text-white text-6xl font-bold mt-2 leading-tight">{effectiveCurrent.summary}</p>
-                    {effectiveCurrent._optimistic ? (
-                      <p className="text-slate-400 text-xl mt-2">Just booked</p>
-                    ) : (
-                      <>
-                        <p className="text-slate-400 text-xl mt-2">Until {formatTime(currentEnd)}</p>
-                        <p className="text-slate-500 text-lg">{formatDuration(timeRemaining)} remaining</p>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
+            <div className="flex-1 flex flex-col justify-center space-y-3">
+              {isFree ? (
+                <>
+                  <p className="text-green-400 text-7xl font-extrabold tracking-tight leading-none">Free</p>
+                  <p className="text-slate-300 text-2xl">
+                    {nextStart ? `Until ${formatTime(nextStart)}` : 'Rest of the day'}
+                  </p>
+                  {timeUntilNext && (
+                    <p className="text-slate-500 text-lg">{formatDuration(timeUntilNext)} from now</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-white text-6xl font-bold leading-tight">{effectiveCurrent.summary}</p>
+                  {effectiveCurrent._optimistic ? (
+                    <p className="text-slate-400 text-xl">Just booked</p>
+                  ) : (
+                    <>
+                      <p className="text-slate-400 text-xl">Until {formatTime(currentEnd)}</p>
+                      <p className="text-slate-500 text-base">{formatDuration(timeRemaining)} remaining</p>
+                    </>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Book Now */}
