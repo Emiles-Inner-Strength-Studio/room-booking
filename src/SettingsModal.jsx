@@ -1,34 +1,15 @@
 import { useState, useEffect } from 'react'
 
 export default function SettingsModal({ onClose, onSave, gcal }) {
-  const [clientId, setClientId] = useState(localStorage.getItem('gcal_client_id') || '')
-  const [apiKey, setApiKey] = useState(localStorage.getItem('gcal_api_key') || '')
   const [rooms, setRooms] = useState([])
   const [selectedRoom, setSelectedRoom] = useState(localStorage.getItem('gcal_room_id') || '')
   const [selectedRoomName, setSelectedRoomName] = useState(localStorage.getItem('gcal_room_name') || '')
   const [loadingRooms, setLoadingRooms] = useState(false)
-  const [authing, setAuthing] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  const handleSaveCredentials = () => {
-    localStorage.setItem('gcal_client_id', clientId.trim())
-    localStorage.setItem('gcal_api_key', apiKey.trim())
-    setSaved(true)
-    setTimeout(() => window.location.reload(), 800)
-  }
-
-  const handleAuth = async () => {
-    setAuthing(true)
-    const ok = await gcal.signIn()
-    setAuthing(false)
-    if (ok) await loadRooms()
-  }
 
   const loadRooms = async () => {
     setLoadingRooms(true)
     try {
       const items = await gcal.listRooms()
-      // Filter to likely room resources (resourceType or name hints)
       setRooms(items)
     } catch (e) {
       console.error(e)
@@ -37,7 +18,7 @@ export default function SettingsModal({ onClose, onSave, gcal }) {
   }
 
   useEffect(() => {
-    if (gcal.authed && rooms.length === 0) loadRooms()
+    if (gcal.authed) loadRooms()
   }, [gcal.authed])
 
   const handleSelectRoom = (room) => {
@@ -60,55 +41,18 @@ export default function SettingsModal({ onClose, onSave, gcal }) {
           <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none">×</button>
         </div>
 
-        {/* Credentials */}
+        {/* Auth status */}
         <div className="space-y-3">
-          <h3 className="text-slate-400 text-sm font-medium uppercase tracking-wide">Google API Credentials</h3>
-          <div>
-            <label className="text-slate-300 text-sm mb-1 block">Client ID</label>
-            <input
-              className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={clientId}
-              onChange={e => setClientId(e.target.value)}
-              placeholder="xxxx.apps.googleusercontent.com"
-            />
-          </div>
-          <div>
-            <label className="text-slate-300 text-sm mb-1 block">API Key</label>
-            <input
-              className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              placeholder="AIza..."
-            />
-          </div>
-          <button
-            onClick={handleSaveCredentials}
-            className="bg-blue-600 hover:bg-blue-500 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-          >
-            {saved ? '✓ Saved — reloading...' : 'Save & Reload'}
-          </button>
+          <h3 className="text-slate-400 text-sm font-medium uppercase tracking-wide">Google Account</h3>
+          {gcal.authed ? (
+            <div className="flex items-center gap-3">
+              <span className="text-green-400 text-sm">✓ Signed in</span>
+              <button onClick={gcal.signOut} className="text-slate-400 hover:text-white text-sm underline">Sign out</button>
+            </div>
+          ) : (
+            <p className="text-slate-400 text-sm">Not signed in. Sign in from the main screen.</p>
+          )}
         </div>
-
-        {/* Auth */}
-        {gcal.ready && (
-          <div className="space-y-3">
-            <h3 className="text-slate-400 text-sm font-medium uppercase tracking-wide">Google Account</h3>
-            {gcal.authed ? (
-              <div className="flex items-center gap-3">
-                <span className="text-green-400 text-sm">✓ Signed in</span>
-                <button onClick={gcal.signOut} className="text-slate-400 hover:text-white text-sm underline">Sign out</button>
-              </div>
-            ) : (
-              <button
-                onClick={handleAuth}
-                disabled={authing}
-                className="bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-              >
-                {authing ? 'Signing in...' : 'Sign in with Google'}
-              </button>
-            )}
-          </div>
-        )}
 
         {/* Room selection */}
         {gcal.authed && (
@@ -117,7 +61,7 @@ export default function SettingsModal({ onClose, onSave, gcal }) {
             {loadingRooms ? (
               <p className="text-slate-400 text-sm">Loading calendars...</p>
             ) : (
-              <div className="space-y-2 max-h-48 overflow-y-auto">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
                 {rooms.map(room => (
                   <button
                     key={room.id}

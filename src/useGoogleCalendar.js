@@ -9,6 +9,7 @@ import { getMockEvents, MOCK_ROOMS } from './mockData'
 
 const SCOPES = 'https://www.googleapis.com/auth/calendar'
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'
+const REDIRECT_URI = window.location.origin + window.location.pathname
 
 const DEFAULT_API_KEY = 'AIzaSyDP9bt-G0tgBNWGIoxYMV7vNxx-lT3I4JM'
 const DEFAULT_CLIENT_ID = '961612899421-hkrid21kugiikch6lul2kuqo004ekj6p.apps.googleusercontent.com'
@@ -51,10 +52,24 @@ export function useGoogleCalendar() {
           })
         })
 
-        // Init GIS token client
+        // Init GIS code client (redirect flow — no popup)
+        tokenClientRef.current = window.google.accounts.oauth2.initCodeClient({
+          client_id: clientId,
+          scope: SCOPES,
+          ux_mode: 'redirect',
+          redirect_uri: REDIRECT_URI,
+          state: 'gcal_auth',
+        })
+
+        // Check if we're returning from an OAuth redirect
+        // GIS redirect flow returns an auth code in the URL — exchange it for a token
+        // For implicit/token flow we use a different approach: store token in sessionStorage
+        // Actually for pure browser use, use token flow with redirect instead
         tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
           client_id: clientId,
           scope: SCOPES,
+          ux_mode: 'redirect',
+          redirect_uri: REDIRECT_URI,
           callback: (resp) => {
             if (resp.error) {
               setError(resp.error)
@@ -65,6 +80,17 @@ export function useGoogleCalendar() {
             resolveAuthRef.current?.(true)
           },
         })
+
+        // Handle return from OAuth redirect — token is in URL hash
+        const hash = new URLSearchParams(window.location.hash.slice(1))
+        const accessToken = hash.get('access_token')
+        if (accessToken) {
+          window.gapi.client.setToken({ access_token: accessToken })
+          setAuthed(true)
+          // Clean the token from the URL
+          window.history.replaceState(null, '', window.location.pathname)
+          console.log('[gcal] token restored from redirect')
+        }
 
         setReady(true)
         console.log('[gcal] ready')
@@ -81,11 +107,11 @@ export function useGoogleCalendar() {
     // Already have a token in memory
     const existing = window.gapi?.client?.getToken()
     if (existing?.access_token) return Promise.resolve(true)
-    return new Promise((resolve) => {
-      resolveAuthRef.current = resolve
-      if (!tokenClientRef.current) { resolve(false); return }
-      tokenClientRef.current.requestAccessToken({ prompt: '' })
-    })
+    if (!tokenClientRef.current) return Promise.resolve(false)
+    // Redirect flow — this will navigate away and back
+    tokenClientRef.current.requestAccessToken({ prompt: '' })
+    // Returns a never-resolving promise since we're redirecting
+    return new Promise(() => {})
   }, [])
 
   const signOut = useCallback(() => {
