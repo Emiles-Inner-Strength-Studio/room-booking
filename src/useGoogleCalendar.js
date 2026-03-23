@@ -39,9 +39,8 @@ function loadSavedToken() {
     const raw = localStorage.getItem(TOKEN_KEY)
     if (!raw) return null
     const { access_token, expiry } = JSON.parse(raw)
-    // Return token if it has more than 5 minutes left
-    if (expiry - Date.now() > 5 * 60 * 1000) return { access_token }
-    return null // expired
+    const msLeft = expiry - Date.now()
+    return { access_token, expiry, msLeft, expired: msLeft <= 0 }
   } catch { return null }
 }
 
@@ -111,12 +110,20 @@ export function useGoogleCalendar() {
         // Try restoring a saved token
         const saved = loadSavedToken()
         if (saved) {
+          // Always restore the token into GAPI (even if expired) so API calls
+          // that happen before the silent refresh completes don't hard-fail
           window.gapi.client.setToken({ access_token: saved.access_token })
           setAuthed(true)
-          // Schedule refresh based on remaining time
-          const remaining = Math.max((saved.expiry - Date.now()) / 1000, 0)
-          scheduleRefresh(remaining, silentRefresh)
-          console.log('[gcal] token restored from storage,', Math.round(remaining / 60), 'min remaining')
+
+          if (saved.expired) {
+            // Token expired — attempt silent refresh immediately (no prompt)
+            console.log('[gcal] saved token expired, attempting silent refresh...')
+            silentRefresh()
+          } else {
+            const remaining = Math.max(saved.msLeft / 1000, 0)
+            scheduleRefresh(remaining, silentRefresh)
+            console.log('[gcal] token restored,', Math.round(remaining / 60), 'min remaining')
+          }
         } else {
           console.log('[gcal] no saved token — sign-in required')
         }
