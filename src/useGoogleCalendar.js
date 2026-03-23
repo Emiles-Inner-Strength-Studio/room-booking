@@ -11,9 +11,12 @@ import { getMockEvents, MOCK_ROOMS } from './mockData'
 const SCOPES = 'https://www.googleapis.com/auth/calendar'
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'
 
+const DEFAULT_API_KEY = 'AIzaSyDP9bt-G0tgBNWGIoxYMV7vNxx-lT3I4JM'
+const DEFAULT_CLIENT_ID = '961612899421-hkrid21kugiikch6lul2kuqo004ekj6p.apps.googleusercontent.com'
+
 function hasValidCredentials() {
-  const clientId = localStorage.getItem('gcal_client_id') || ''
-  const apiKey = localStorage.getItem('gcal_api_key') || ''
+  const clientId = localStorage.getItem('gcal_client_id') || DEFAULT_CLIENT_ID
+  const apiKey = localStorage.getItem('gcal_api_key') || DEFAULT_API_KEY
   return clientId.length > 10 && apiKey.length > 10
 }
 
@@ -39,8 +42,8 @@ export function useGoogleCalendar() {
   useEffect(() => {
     if (!credentialsPresent) return
 
-    const clientId = localStorage.getItem('gcal_client_id') || ''
-    const apiKey = localStorage.getItem('gcal_api_key') || ''
+    const clientId = localStorage.getItem('gcal_client_id') || DEFAULT_CLIENT_ID
+    const apiKey = localStorage.getItem('gcal_api_key') || DEFAULT_API_KEY
 
     const initGapi = () => new Promise((resolve, reject) => {
       window.gapi.load('client', async () => {
