@@ -24,15 +24,18 @@ function formatDuration(ms) {
 }
 
 // Parse "Location - Company - Floor - Room Name (capacity)" format
-// Returns { displayName, location, capacity }
+// Handles both " - " and "-" separators
+// Returns { displayName, subtitle, capacity }
 function parseRoomName(raw = '') {
-  const parts = raw.split(' - ').map(s => s.trim()).filter(Boolean)
+  // Normalise separators: " - " or " – " or just "-" with optional spaces
+  const parts = raw.split(/\s*[-–]\s*/).map(s => s.trim()).filter(Boolean)
   const last = parts[parts.length - 1] || raw
   const capacityMatch = last.match(/^(.*?)\s*\((\d+)\)\s*$/)
   const displayName = capacityMatch ? capacityMatch[1].trim() : last.replace(/\s*\(\d+\)\s*$/, '').trim()
   const capacity = capacityMatch ? capacityMatch[2] : (raw.match(/\((\d+)\)/) || [])[1] || null
-  const location = parts.length > 1 ? parts[0] : null
-  return { displayName, location, capacity }
+  // Subtitle = everything except the last segment (room name)
+  const subtitle = parts.length > 1 ? parts.slice(0, -1).join(' · ') : null
+  return { displayName, subtitle, capacity }
 }
 
 function getCurrentAndNext(events, now) {
@@ -154,7 +157,7 @@ export default function App() {
             )}
           </div>
           <p className="text-slate-500 text-sm mt-0.5">
-            {[parseRoomName(roomName).location, now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })].filter(Boolean).join(' · ')}
+            {[parseRoomName(roomName).subtitle, now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })].filter(Boolean).join(' · ')}
           </p>
         </div>
         <div className="text-4xl font-light tabular-nums text-slate-200">{formatTime(now)}</div>
@@ -244,7 +247,7 @@ export default function App() {
                       <div
                         key={event.id}
                         className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all ${
-                          isNow ? 'bg-red-500/10 border-red-500/30 sticky top-0 z-10 shadow-lg'
+                          isNow ? 'bg-red-950/90 border-red-500/40 sticky top-0 z-10 shadow-xl backdrop-blur-sm'
                           : isPast ? 'bg-slate-800/20 border-slate-700/20 opacity-35'
                           : 'bg-slate-800/50 border-slate-700/30'
                         }`}
