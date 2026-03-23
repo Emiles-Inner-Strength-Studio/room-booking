@@ -152,15 +152,15 @@ export default function App() {
         <div className="flex-1 flex overflow-hidden">
 
           {/* LEFT — Availability */}
-          <div className={`w-1/2 flex flex-col p-8 border-r border-slate-800 ${isFree ? 'bg-green-500/5' : 'bg-red-500/5'}`}>
+          <div className={`w-2/3 flex flex-col p-8 border-r border-slate-800 ${isFree ? 'bg-green-500/5' : 'bg-red-500/5'}`}>
 
             {/* Big status */}
             <div className="flex-1 flex flex-col justify-center">
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-4 h-4 rounded-full flex-shrink-0 ${isFree ? 'bg-green-400' : 'bg-red-400 animate-pulse'}`} />
+              </div>
               <div className={`text-7xl font-extrabold tracking-tight leading-none ${isFree ? 'text-green-400' : 'text-red-400'}`}>
                 {isFree ? 'Available' : 'In Use'}
-              </div>
-              <div className={`mt-3 text-3xl font-semibold ${isFree ? 'text-green-500/70' : 'text-red-500/70'}`}>
-                {isFree ? '●' : '●'}
               </div>
 
               <div className="mt-6 space-y-1">
@@ -203,7 +203,7 @@ export default function App() {
           </div>
 
           {/* RIGHT — Schedule */}
-          <div className="w-1/2 flex flex-col overflow-hidden">
+          <div className="w-1/3 flex flex-col overflow-hidden">
             <div className="px-8 pt-7 pb-3">
               <h2 className="text-slate-500 text-xs font-semibold uppercase tracking-widest">Today's Schedule</h2>
             </div>
