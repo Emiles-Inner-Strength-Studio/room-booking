@@ -142,6 +142,12 @@ export default function App() {
             <h1 className="text-3xl font-bold tracking-tight">
               {parseRoomName(roomName).displayName || 'Room Booking'}
             </h1>
+            {parseRoomName(roomName).capacity && (
+              <span className="text-slate-500 text-sm flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                {parseRoomName(roomName).capacity}
+              </span>
+            )}
             <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
               isFree
                 ? 'bg-green-500/20 text-green-400 border border-green-500/40'
@@ -149,12 +155,6 @@ export default function App() {
             }`}>
               {isFree ? 'Available' : 'In Use'}
             </span>
-            {parseRoomName(roomName).capacity && (
-              <span className="text-slate-500 text-sm flex items-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                {parseRoomName(roomName).capacity}
-              </span>
-            )}
           </div>
           <p className="text-slate-500 text-sm mt-0.5">
             {[parseRoomName(roomName).subtitle, now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })].filter(Boolean).join(' · ')}
