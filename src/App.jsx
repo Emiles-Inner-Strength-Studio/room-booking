@@ -163,6 +163,19 @@ export default function App() {
         <div className="text-4xl font-light tabular-nums text-slate-200">{formatTime(now)}</div>
       </div>
 
+      {/* Non-blocking reconnect banner */}
+      {gcal.authed && gcal.needsReconnect && (
+        <div className="bg-amber-500/20 border-b border-amber-500/40 px-6 py-2 flex items-center justify-between">
+          <p className="text-amber-300 text-sm">Session expired — calendar may not update until you reconnect.</p>
+          <button
+            onClick={() => gcal.signIn()}
+            className="text-amber-300 border border-amber-500/50 px-3 py-1 rounded-lg text-sm font-medium hover:bg-amber-500/20 transition-colors ml-4 flex-shrink-0"
+          >
+            Reconnect
+          </button>
+        </div>
+      )}
+
       {/* Not signed in */}
       {!gcal.authed ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
