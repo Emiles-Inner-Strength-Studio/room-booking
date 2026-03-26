@@ -1,8 +1,9 @@
 /**
  * useGoogleCalendar — hook for Google Calendar API access via GAPI + GIS
  *
- * Persists OAuth token in localStorage so sign-in survives page reloads.
- * Silently refreshes expired tokens via redirect (no prompt).
+ * Uses redirect flow (ux_mode: 'redirect') for lockdown browser compatibility.
+ * Token returned in URL hash after redirect, persisted to localStorage.
+ * Silent refresh attempts on expiry — falls back to full redirect if needed.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -10,7 +11,6 @@ import { getMockEvents, MOCK_ROOMS } from './mockData'
 
 const SCOPES = 'https://www.googleapis.com/auth/calendar'
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'
-const REDIRECT_URI = window.location.origin + window.location.pathname
 const TOKEN_KEY = 'gcal_token'
 
 const DEFAULT_API_KEY = 'AIzaSyDP9bt-G0tgBNWGIoxYMV7vNxx-lT3I4JM'
@@ -19,13 +19,15 @@ const DEFAULT_CLIENT_ID = '961612899421-hkrid21kugiikch6lul2kuqo004ekj6p.apps.go
 const getClientId = () => localStorage.getItem('gcal_client_id') || DEFAULT_CLIENT_ID
 const getApiKey = () => localStorage.getItem('gcal_api_key') || DEFAULT_API_KEY
 
+// Redirect URI must be registered in GCP OAuth client as an authorised redirect URI
+const REDIRECT_URI = window.location.origin + window.location.pathname.replace(/\/$/, '')
+
 let refreshTimer = null
 
 function scheduleRefresh(expiresIn, refreshFn) {
   if (refreshTimer) clearTimeout(refreshTimer)
-  // Refresh 5 minutes before expiry (or immediately if already close)
   const delay = Math.max((Number(expiresIn) - 300) * 1000, 10000)
-  console.log(`[gcal] token refresh scheduled in ${Math.round(delay / 60000)}m`)
+  console.log(`[gcal] refresh scheduled in ${Math.round(delay / 60000)}m`)
   refreshTimer = setTimeout(refreshFn, delay)
 }
 
@@ -48,6 +50,21 @@ function clearSavedToken() {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+// Build the Google OAuth URL manually for redirect flow
+// GIS initTokenClient with ux_mode:'redirect' handles this, but we also
+// need to support manual URL construction as fallback
+function buildAuthUrl(clientId, prompt = '') {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: REDIRECT_URI,
+    response_type: 'token',
+    scope: SCOPES,
+    include_granted_scopes: 'true',
+    ...(prompt && { prompt }),
+  })
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
+}
+
 export function useGoogleCalendar() {
   const [ready, setReady] = useState(false)
   const [authed, setAuthed] = useState(false)
@@ -67,12 +84,23 @@ export function useGoogleCalendar() {
       document.head.appendChild(s)
     })
 
+    const silentRefresh = () => {
+      console.log('[gcal] silent refresh via redirect...')
+      // prompt='' triggers a silent redirect if session is still active
+      window.location.href = buildAuthUrl(clientId, '')
+    }
+
     const init = async () => {
       try {
+        // Check for token in URL hash (returning from OAuth redirect)
+        const hash = new URLSearchParams(window.location.hash.slice(1))
+        const accessToken = hash.get('access_token')
+        const expiresIn = hash.get('expires_in')
+
         await loadScript('https://apis.google.com/js/api.js')
-        await loadScript('https://accounts.google.com/gsi/client')
 
         await new Promise((resolve, reject) => {
+          if (!window.gapi) { reject(new Error('gapi script failed to load')); return }
           window.gapi.load('client', async () => {
             try {
               await window.gapi.client.init({ apiKey, discoveryDocs: [DISCOVERY_DOC] })
@@ -81,55 +109,37 @@ export function useGoogleCalendar() {
           })
         })
 
-        const silentRefresh = () => {
-          console.log('[gcal] attempting silent token refresh...')
-          tokenClientRef.current?.requestAccessToken({ prompt: '' })
+        // Load GIS for sign-out / revoke only (auth is handled via manual redirect)
+        await loadScript('https://accounts.google.com/gsi/client')
+
+        // Check for token in URL hash (returning from OAuth redirect)
+        if (accessToken) {
+          window.history.replaceState(null, '', window.location.pathname)
+          saveToken({ access_token: accessToken, expires_in: Number(expiresIn) || 3600 })
+          console.log('[gcal] token received from redirect, expires in', expiresIn, 's')
         }
 
-        tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: SCOPES,
-          callback: (resp) => {
-            if (resp.error) {
-              console.warn('[gcal] token refresh failed:', resp.error)
-              // Only clear authed if it's not just a transient error
-              if (resp.error === 'interaction_required' || resp.error === 'login_required') {
-                setAuthed(false)
-                clearSavedToken()
-              }
-              return
-            }
-            window.gapi.client.setToken({ access_token: resp.access_token })
-            saveToken({ access_token: resp.access_token, expires_in: resp.expires_in })
-            setAuthed(true)
-            scheduleRefresh(resp.expires_in, silentRefresh)
-            console.log('[gcal] token refreshed, expires in', resp.expires_in, 's')
-          },
-        })
-
-        // Try restoring a saved token
+        // Restore saved token
         const saved = loadSavedToken()
         if (saved) {
-          // Always restore the token into GAPI (even if expired) so API calls
-          // that happen before the silent refresh completes don't hard-fail
           window.gapi.client.setToken({ access_token: saved.access_token })
           setAuthed(true)
-
           if (saved.expired) {
-            // Token expired — attempt silent refresh immediately (no prompt)
-            console.log('[gcal] saved token expired, attempting silent refresh...')
+            console.log('[gcal] saved token expired, silent refresh...')
             silentRefresh()
           } else {
-            const remaining = Math.max(saved.msLeft / 1000, 0)
-            scheduleRefresh(remaining, silentRefresh)
-            console.log('[gcal] token restored,', Math.round(remaining / 60), 'min remaining')
+            scheduleRefresh(saved.msLeft / 1000, silentRefresh)
+            console.log('[gcal] token restored,', Math.round(saved.msLeft / 60000), 'min remaining')
           }
         } else {
-          console.log('[gcal] no saved token — sign-in required')
+          console.log('[gcal] no saved token')
         }
 
+        // Store silentRefresh ref so tokenClientRef can be used for sign-out
+        tokenClientRef.current = { silentRefresh }
+
         setReady(true)
-        console.log('[gcal] ready')
+        console.log('[gcal] ready, redirect_uri:', REDIRECT_URI)
       } catch (e) {
         console.error('[gcal] init failed:', e)
         setError('Google API init failed')
@@ -140,17 +150,15 @@ export function useGoogleCalendar() {
   }, [])
 
   const signIn = useCallback(() => {
-    const existing = window.gapi?.client?.getToken()
-    if (existing?.access_token) return Promise.resolve(true)
-    if (!tokenClientRef.current) return Promise.resolve(false)
-    // Popup flow — callback sets authed state
-    tokenClientRef.current.requestAccessToken({ prompt: '' })
-    return Promise.resolve(true)
+    const clientId = getClientId()
+    // Always use redirect — works in all browsers including lockdown
+    window.location.href = buildAuthUrl(clientId, 'select_account')
+    return new Promise(() => {}) // navigates away
   }, [])
 
   const signOut = useCallback(() => {
     const token = window.gapi?.client?.getToken()
-    if (token?.access_token) {
+    if (token?.access_token && window.google?.accounts?.oauth2) {
       window.google.accounts.oauth2.revoke(token.access_token)
       window.gapi.client.setToken('')
     }
@@ -185,8 +193,7 @@ export function useGoogleCalendar() {
       return { id: `mock-booked-${Date.now()}`, summary: title }
     }
     if (!window.gapi?.client?.getToken()?.access_token) {
-      tokenClientRef.current?.requestAccessToken({ prompt: '' })
-      throw new Error('Re-authenticating — please try again in a moment')
+      throw new Error('Not authenticated — please sign in')
     }
     const endTime = new Date(startTime.getTime() + durationMinutes * 60000)
     const res = await window.gapi.client.calendar.events.insert({
