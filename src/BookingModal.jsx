@@ -60,7 +60,6 @@ export default function BookingModal({ onClose, onConfirm, startTime }) {
           <div>
             <label className="text-slate-400 text-sm font-medium uppercase tracking-wide mb-2 block">Meeting name</label>
             <input
-              autoFocus
               className="w-full bg-slate-700 text-white rounded-2xl px-5 py-4 text-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500"
               value={title}
               onChange={e => setTitle(e.target.value)}
