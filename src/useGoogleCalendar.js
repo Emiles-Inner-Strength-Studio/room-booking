@@ -1,11 +1,11 @@
 /**
- * useGoogleCalendar — hook for Google Calendar API access via GAPI + GIS
+ * useGoogleCalendar — hook for Google Calendar API access
  *
- * Auth strategy:
- *  - Initial sign-in: full redirect (works in lockdown browsers)
- *  - Background refresh: GIS initTokenClient prompt:'' (hidden iframe, no navigation)
- *  - Org session expiry: non-blocking reconnect banner (authed stays true, UI stays up)
- *  - Refresh frequency: every 30 minutes regardless of token expiry
+ * Two modes:
+ *  1. Service account (backend): auto-detected via /api/health — no sign-in needed
+ *  2. GAPI + GIS (client-side): full redirect OAuth, silent refresh every 30min
+ *
+ * The hook auto-detects which mode to use on init.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -56,11 +56,57 @@ function clearSavedToken() {
 
 let refreshTimer = null
 
+// ── Backend (service account) API helpers ──
+
+const getApiKeyHeader = () => {
+  const key = localStorage.getItem('gcal_api_key_backend')
+  return key ? { Authorization: `Bearer ${key}` } : {}
+}
+
+async function backendListRooms() {
+  const res = await fetch('/api/rooms', { headers: getApiKeyHeader() })
+  if (!res.ok) throw new Error(`rooms: ${res.status}`)
+  return res.json()
+}
+
+async function backendGetTodayEvents(calendarId) {
+  const res = await fetch(`/api/events?calendarId=${encodeURIComponent(calendarId)}`, {
+    headers: getApiKeyHeader(),
+  })
+  if (!res.ok) throw new Error(`events: ${res.status}`)
+  return res.json()
+}
+
+async function backendBookRoom(calendarId, { title, startTime, durationMinutes }) {
+  const res = await fetch('/api/book', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getApiKeyHeader() },
+    body: JSON.stringify({ calendarId, title, startTime: startTime.toISOString(), durationMinutes }),
+  })
+  if (!res.ok) throw new Error(`book: ${res.status}`)
+  return res.json()
+}
+
+async function detectBackend() {
+  if (localStorage.getItem('gcal_force_sso') === '1') return false
+  try {
+    const res = await fetch('/api/health', { signal: AbortSignal.timeout(3000) })
+    if (res.ok) {
+      const data = await res.json()
+      return data.ok === true
+    }
+  } catch { /* backend not available */ }
+  return false
+}
+
+// ── Hook ──
+
 export function useGoogleCalendar() {
   const [ready, setReady] = useState(false)
   const [authed, setAuthed] = useState(false)
-  const [needsReconnect, setNeedsReconnect] = useState(false) // non-blocking banner
+  const [needsReconnect, setNeedsReconnect] = useState(false)
   const [isMock] = useState(false)
+  const [isBackend, setIsBackend] = useState(false)
   const [error, setError] = useState(null)
   const tokenClientRef = useRef(null)
 
@@ -78,12 +124,23 @@ export function useGoogleCalendar() {
 
     const scheduleNextRefresh = (silentRefreshFn) => {
       if (refreshTimer) clearInterval(refreshTimer)
-      // Refresh every 30 minutes — well within typical token lifetimes
       refreshTimer = setInterval(silentRefreshFn, REFRESH_INTERVAL_MS)
       console.log('[gcal] refresh interval set: every 30min')
     }
 
     const init = async () => {
+      // Try backend (service account) first
+      const hasBackend = await detectBackend()
+      if (hasBackend) {
+        console.log('[gcal] backend detected — using service account mode')
+        setIsBackend(true)
+        setAuthed(true)
+        setReady(true)
+        return
+      }
+
+      // Fall back to GAPI + GIS client-side auth
+      console.log('[gcal] no backend — using client-side GAPI auth')
       try {
         await loadScript('https://apis.google.com/js/api.js')
 
@@ -99,7 +156,6 @@ export function useGoogleCalendar() {
 
         await loadScript('https://accounts.google.com/gsi/client')
 
-        // GIS token client for SILENT background refresh only (no redirect, uses hidden iframe)
         const silentRefresh = () => {
           if (!tokenClientRef.current) return
           console.log('[gcal] silent background refresh...')
@@ -113,7 +169,6 @@ export function useGoogleCalendar() {
             if (resp.error) {
               console.warn('[gcal] silent refresh failed:', resp.error)
               if (resp.error === 'interaction_required' || resp.error === 'login_required') {
-                // Org session expired — show reconnect banner but keep UI up
                 setNeedsReconnect(true)
                 console.log('[gcal] org session expired — reconnect banner shown')
               }
@@ -127,7 +182,6 @@ export function useGoogleCalendar() {
           },
         })
 
-        // Handle token returned from redirect sign-in
         const hash = new URLSearchParams(window.location.hash.slice(1))
         const accessToken = hash.get('access_token')
         const expiresIn = hash.get('expires_in')
@@ -145,7 +199,6 @@ export function useGoogleCalendar() {
             window.gapi.client.setToken({ access_token: saved.access_token })
             setAuthed(true)
             console.log('[gcal] token restored,', Math.round(saved.msLeft / 60000), 'min remaining')
-            // Always start a silent refresh immediately on load (checks if org session still active)
             silentRefresh()
           } else {
             console.log('[gcal] no saved token')
@@ -166,13 +219,14 @@ export function useGoogleCalendar() {
     return () => { if (refreshTimer) clearInterval(refreshTimer) }
   }, [])
 
-  // Full redirect sign-in (for lockdown browsers / reconnect after org session expiry)
   const signIn = useCallback(() => {
+    if (isBackend) return Promise.resolve() // no-op in backend mode
     window.location.href = buildAuthUrl(getClientId(), 'select_account')
     return new Promise(() => {})
-  }, [])
+  }, [isBackend])
 
   const signOut = useCallback(() => {
+    if (isBackend) return // no-op in backend mode
     const token = window.gapi?.client?.getToken()
     if (token?.access_token && window.google?.accounts?.oauth2) {
       window.google.accounts.oauth2.revoke(token.access_token)
@@ -182,16 +236,18 @@ export function useGoogleCalendar() {
     if (refreshTimer) clearInterval(refreshTimer)
     setAuthed(false)
     setNeedsReconnect(false)
-  }, [])
+  }, [isBackend])
 
   const listRooms = useCallback(async () => {
     if (isMock) return MOCK_ROOMS
+    if (isBackend) return backendListRooms()
     const res = await window.gapi.client.calendar.calendarList.list({ minAccessRole: 'reader' })
     return res.result.items || []
-  }, [isMock])
+  }, [isMock, isBackend])
 
   const getTodayEvents = useCallback(async (calendarId) => {
     if (isMock) return getMockEvents()
+    if (isBackend) return backendGetTodayEvents(calendarId)
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
     const endOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
@@ -203,13 +259,14 @@ export function useGoogleCalendar() {
       orderBy: 'startTime',
     })
     return res.result.items || []
-  }, [isMock])
+  }, [isMock, isBackend])
 
   const bookRoom = useCallback(async (calendarId, { title, startTime, durationMinutes }) => {
     if (isMock) {
       console.log('[mock] Booked:', { title, startTime, durationMinutes })
       return { id: `mock-booked-${Date.now()}`, summary: title }
     }
+    if (isBackend) return backendBookRoom(calendarId, { title, startTime, durationMinutes })
     if (!window.gapi?.client?.getToken()?.access_token) {
       throw new Error('Not authenticated — please sign in')
     }
@@ -224,7 +281,7 @@ export function useGoogleCalendar() {
       },
     })
     return res.result
-  }, [isMock])
+  }, [isMock, isBackend])
 
-  return { ready, authed, needsReconnect, error, isMock, signIn, signOut, listRooms, getTodayEvents, bookRoom }
+  return { ready, authed, needsReconnect, error, isMock, isBackend, signIn, signOut, listRooms, getTodayEvents, bookRoom }
 }

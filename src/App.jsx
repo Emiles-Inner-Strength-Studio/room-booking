@@ -79,6 +79,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(null)
   const [optimisticInUse, setOptimisticInUse] = useState(null)
+  const [backendError, setBackendError] = useState(null)
   const refreshIntervalRef = useRef(null)
 
   const loadEvents = useCallback(async () => {
@@ -88,8 +89,10 @@ export default function App() {
       const items = await gcal.getTodayEvents(roomId)
       setEvents(items)
       setLastRefresh(new Date())
+      setBackendError(null)
     } catch (e) {
       console.error('Failed to load events', e)
+      setBackendError(e.message || 'Failed to load events')
     }
     setLoading(false)
   }, [gcal.authed, roomId, gcal.getTodayEvents])
@@ -176,6 +179,22 @@ export default function App() {
         </div>
       )}
 
+      {/* Backend error banner */}
+      {backendError && (
+        <div className="bg-red-500/20 border-b border-red-500/40 px-6 py-2 flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-red-300 text-sm">Server error — calendar may not be up to date.</p>
+            <p className="text-red-400/70 text-xs font-mono truncate mt-0.5">{backendError}</p>
+          </div>
+          <button
+            onClick={() => { setBackendError(null); loadEvents() }}
+            className="text-red-300 border border-red-500/50 px-3 py-1 rounded-lg text-sm font-medium hover:bg-red-500/20 transition-colors ml-4 flex-shrink-0"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Not signed in */}
       {!gcal.authed ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
@@ -191,6 +210,17 @@ export default function App() {
             Sign in with Google
           </button>
           {gcal.error && <p className="text-red-400 text-base">{gcal.error}</p>}
+          {localStorage.getItem('gcal_force_sso') === '1' && (
+            <button
+              onClick={() => {
+                localStorage.removeItem('gcal_force_sso')
+                window.location.reload()
+              }}
+              className="text-slate-500 hover:text-slate-300 text-sm underline transition-colors"
+            >
+              Switch to Service Account
+            </button>
+          )}
         </div>
       ) : (
         /* Two-column layout */
