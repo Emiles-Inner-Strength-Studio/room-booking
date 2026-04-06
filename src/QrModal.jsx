@@ -32,7 +32,7 @@ export default function QrModal({ url, onClose }) {
           <p className="text-slate-400 text-base">Scan with your phone to send email</p>
         </div>
         <div className="px-8 pb-8">
-          <TimerCloseButton onClick={onClose} />
+          <TimerCloseButton onClick={onClose} className="w-full" />
         </div>
       </div>
     </div>
