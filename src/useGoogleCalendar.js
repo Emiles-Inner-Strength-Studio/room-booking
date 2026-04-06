@@ -289,7 +289,7 @@ export function useGoogleCalendar() {
       return
     }
     if (isBackend) {
-      const res = await fetch(`/api/events/${encodeURIComponent(eventId)}?calendarId=${encodeURIComponent(calendarId)}`, {
+      const res = await fetch(`/api/events?calendarId=${encodeURIComponent(calendarId)}&eventId=${encodeURIComponent(eventId)}`, {
         method: 'DELETE',
         headers: getApiKeyHeader(),
       })
