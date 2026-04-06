@@ -1,4 +1,7 @@
-export default function EventDetailModal({ event, onClose, onEmail, onCancel }) {
+import { useState } from 'react'
+import { generateQrSvg } from './qr'
+
+export default function EventDetailModal({ event, onClose, onCancel }) {
   const start = new Date(event.start.dateTime || event.start.date)
   const end = new Date(event.end.dateTime || event.end.date)
   const fmt = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -13,6 +16,12 @@ export default function EventDetailModal({ event, onClose, onEmail, onCancel }) 
   const organizer = event.organizer
   const attendees = (event.attendees || []).filter(a => !a.resource && !a.self)
   const isInstantMeeting = event.summary === 'Instant Meeting'
+  const [showQr, setShowQr] = useState(false)
+
+  const mailtoUrl = attendees.length > 0
+    ? `mailto:${attendees.map(a => a.email).join(',')}?subject=${encodeURIComponent(event.summary || 'Meeting')}`
+    : null
+  const qrSvg = mailtoUrl ? generateQrSvg(mailtoUrl, { size: 200, fg: '#ffffff', bg: 'transparent' }) : null
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-8" onClick={onClose}>
@@ -85,6 +94,14 @@ export default function EventDetailModal({ event, onClose, onEmail, onCancel }) 
           {!organizer && attendees.length === 0 && (
             <p className="text-slate-500 text-base text-center py-4">No participant info available</p>
           )}
+
+          {/* QR code for mailto */}
+          {showQr && qrSvg && (
+            <div className="flex flex-col items-center gap-3 py-2">
+              <div className="bg-slate-700/50 rounded-2xl p-6" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+              <p className="text-slate-500 text-sm">Scan to email participants</p>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -97,10 +114,14 @@ export default function EventDetailModal({ event, onClose, onEmail, onCancel }) 
               Cancel Meeting
             </button>
           )}
-          {onEmail && attendees.length > 0 && (
+          {mailtoUrl && (
             <button
-              onClick={() => onEmail(event)}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-5 text-xl font-semibold transition-colors"
+              onClick={() => setShowQr(!showQr)}
+              className={`flex-1 rounded-2xl py-5 text-xl font-semibold transition-colors ${
+                showQr
+                  ? 'bg-transparent text-blue-400 border-2 border-blue-500'
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+              }`}
             >
               Email Participants
             </button>
