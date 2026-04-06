@@ -358,6 +358,12 @@ export default function App() {
         <EventDetailModal
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
+          onEmail={(event) => {
+            const attendees = (event.attendees || []).filter(a => !a.resource && !a.self)
+            const emails = attendees.map(a => a.email).join(',')
+            const subject = encodeURIComponent(event.summary || 'Meeting')
+            window.open(`mailto:${emails}?subject=${subject}`, '_self')
+          }}
         />
       )}
     </div>

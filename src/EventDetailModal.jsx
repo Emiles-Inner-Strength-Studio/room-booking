@@ -1,4 +1,4 @@
-export default function EventDetailModal({ event, onClose }) {
+export default function EventDetailModal({ event, onClose, onEmail }) {
   const start = new Date(event.start.dateTime || event.start.date)
   const end = new Date(event.end.dateTime || event.end.date)
   const fmt = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -87,10 +87,18 @@ export default function EventDetailModal({ event, onClose }) {
         </div>
 
         {/* Actions */}
-        <div className="px-8 pb-8">
+        <div className="px-8 pb-8 flex gap-4">
+          {onEmail && attendees.length > 0 && (
+            <button
+              onClick={() => onEmail(event)}
+              className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-5 text-xl font-semibold transition-colors"
+            >
+              Email Participants
+            </button>
+          )}
           <button
             onClick={onClose}
-            className="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-5 text-xl font-semibold transition-colors"
+            className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-5 text-xl font-semibold transition-colors"
           >
             Close
           </button>
