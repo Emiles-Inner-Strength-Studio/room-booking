@@ -332,7 +332,7 @@ export default function App() {
         <SettingsModal gcal={gcal} onClose={() => setShowSettings(false)} onSave={(id, name) => { setRoomId(id); setRoomName(name) }} onRefresh={loadEvents} />
       )}
       {showBooking && (
-        <BookingModal startTime={now} onClose={() => setShowBooking(false)} onConfirm={handleBook} />
+        <BookingModal startTime={now} maxEnd={nextStart} onClose={() => setShowBooking(false)} onConfirm={handleBook} />
       )}
       {showHelp && (
         <HelpModal roomName={roomName} onClose={() => setShowHelp(false)} />
