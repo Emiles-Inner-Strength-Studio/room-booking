@@ -283,5 +283,24 @@ export function useGoogleCalendar() {
     return res.result
   }, [isMock, isBackend])
 
-  return { ready, authed, needsReconnect, error, isMock, isBackend, signIn, signOut, listRooms, getTodayEvents, bookRoom }
+  const deleteEvent = useCallback(async (calendarId, eventId) => {
+    if (isMock) {
+      console.log('[mock] Deleted:', eventId)
+      return
+    }
+    if (isBackend) {
+      const res = await fetch(`/api/events/${encodeURIComponent(eventId)}?calendarId=${encodeURIComponent(calendarId)}`, {
+        method: 'DELETE',
+        headers: getApiKeyHeader(),
+      })
+      if (!res.ok) throw new Error(`delete: ${res.status}`)
+      return
+    }
+    if (!window.gapi?.client?.getToken()?.access_token) {
+      throw new Error('Not authenticated — please sign in')
+    }
+    await window.gapi.client.calendar.events.delete({ calendarId, eventId })
+  }, [isMock, isBackend])
+
+  return { ready, authed, needsReconnect, error, isMock, isBackend, signIn, signOut, listRooms, getTodayEvents, bookRoom, deleteEvent }
 }

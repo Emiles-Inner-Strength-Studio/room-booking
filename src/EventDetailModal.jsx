@@ -1,4 +1,4 @@
-export default function EventDetailModal({ event, onClose, onEmail }) {
+export default function EventDetailModal({ event, onClose, onEmail, onCancel }) {
   const start = new Date(event.start.dateTime || event.start.date)
   const end = new Date(event.end.dateTime || event.end.date)
   const fmt = (d) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -12,6 +12,7 @@ export default function EventDetailModal({ event, onClose, onEmail }) {
 
   const organizer = event.organizer
   const attendees = (event.attendees || []).filter(a => !a.resource && !a.self)
+  const isInstantMeeting = event.summary === 'Instant Meeting'
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-8" onClick={onClose}>
@@ -88,6 +89,14 @@ export default function EventDetailModal({ event, onClose, onEmail }) {
 
         {/* Actions */}
         <div className="px-8 pb-8 flex gap-4">
+          {onCancel && isInstantMeeting && (
+            <button
+              onClick={() => onCancel(event)}
+              className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 rounded-2xl py-5 text-xl font-semibold transition-colors"
+            >
+              Cancel Meeting
+            </button>
+          )}
           {onEmail && attendees.length > 0 && (
             <button
               onClick={() => onEmail(event)}

@@ -364,6 +364,17 @@ export default function App() {
             const subject = encodeURIComponent(event.summary || 'Meeting')
             window.open(`mailto:${emails}?subject=${subject}`, '_self')
           }}
+          onCancel={async (event) => {
+            try {
+              await gcal.deleteEvent(roomId, event.id)
+              setSelectedEvent(null)
+              await loadEvents()
+              startRefreshCycle(true)
+            } catch (e) {
+              console.error('Failed to cancel meeting', e)
+              setBackendError(e.message || 'Failed to cancel meeting')
+            }
+          }}
         />
       )}
     </div>
