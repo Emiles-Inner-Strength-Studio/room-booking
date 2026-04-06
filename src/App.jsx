@@ -6,6 +6,7 @@ import BookingModal from './BookingModal'
 import HelpModal from './HelpModal'
 import { MOCK_ROOM_NAME } from './mockData'
 
+const MIN_UPTIME_FOR_RELOAD = 5 * 60000
 const REFRESH_INTERVAL = 30000
 const POST_BOOK_RAPID_INTERVAL = 1000
 const POST_BOOK_RAPID_DURATION = 15000
@@ -112,6 +113,19 @@ export default function App() {
     startRefreshCycle(false)
     return () => clearInterval(refreshIntervalRef.current)
   }, [loadEvents, startRefreshCycle])
+
+  // Reload page at midnight if open for at least 5 minutes
+  useEffect(() => {
+    const loadedAt = Date.now()
+    const midnight = new Date()
+    midnight.setHours(24, 0, 0, 0)
+    const timer = setTimeout(() => {
+      if (Date.now() - loadedAt >= MIN_UPTIME_FOR_RELOAD) {
+        window.location.reload()
+      }
+    }, midnight - Date.now())
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleBook = async ({ title, startTime, durationMinutes }) => {
     const until = new Date(startTime.getTime() + OPTIMISTIC_IN_USE_DURATION)
