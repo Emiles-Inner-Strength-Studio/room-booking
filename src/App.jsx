@@ -4,6 +4,7 @@ import { useClock } from './useClock'
 import SettingsModal from './SettingsModal'
 import BookingModal from './BookingModal'
 import HelpModal from './HelpModal'
+import EventDetailModal from './EventDetailModal'
 import { MOCK_ROOM_NAME } from './mockData'
 
 const MIN_UPTIME_FOR_RELOAD = 5 * 60000
@@ -77,6 +78,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showBooking, setShowBooking] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState(null)
   const [loading, setLoading] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(null)
   const [optimisticInUse, setOptimisticInUse] = useState(null)
@@ -303,10 +305,11 @@ export default function App() {
                     return (
                       <div
                         key={event.id}
-                        className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all ${
+                        onClick={() => setSelectedEvent(event)}
+                        className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all cursor-pointer ${
                           isNow ? 'bg-red-500/10 border-red-500/30 sticky top-0 z-10 shadow-lg backdrop-blur-md'
                           : isPast ? 'bg-slate-800/20 border-slate-700/20 opacity-35'
-                          : 'bg-slate-800/50 border-slate-700/30'
+                          : 'bg-slate-800/50 border-slate-700/30 hover:bg-slate-800/70'
                         }`}
                       >
                         <div className="text-right min-w-[4.5rem]">
@@ -350,6 +353,12 @@ export default function App() {
       )}
       {showHelp && (
         <HelpModal roomName={roomName} onClose={() => setShowHelp(false)} />
+      )}
+      {selectedEvent && (
+        <EventDetailModal
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+        />
       )}
     </div>
   )
