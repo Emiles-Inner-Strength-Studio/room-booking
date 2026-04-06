@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAutoClose } from './useAutoClose'
+import TimerCloseButton from './TimerCloseButton'
 
 const DURATIONS = [
   { label: '15m', minutes: 15 },
@@ -25,8 +26,7 @@ export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) 
   const defaultAvailable = maxMinutes == null || DEFAULT_DURATION <= maxMinutes
   const isConstrained = hasUntilNextPreset && !defaultAvailable
 
-  const stableClose = useCallback(onClose, [onClose])
-  useAutoClose(stableClose)
+  useAutoClose(onClose)
 
   const [title, setTitle] = useState('Instant Meeting')
   const [duration, setDuration] = useState(defaultAvailable ? DEFAULT_DURATION : (hasUntilNextPreset ? maxMinutes : DEFAULT_DURATION))
@@ -77,7 +77,7 @@ export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) 
                 {fmt(startTime)} → {fmt(endTime)} · {effectiveDuration}m
               </p>
             </div>
-            <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center">×</button>
+            <TimerCloseButton onClick={onClose} />
           </div>
         </div>
 

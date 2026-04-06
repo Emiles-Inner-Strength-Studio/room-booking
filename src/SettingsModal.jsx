@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useAutoClose } from './useAutoClose'
+import TimerCloseButton from './TimerCloseButton'
 
 export default function SettingsModal({ onClose, onSave, gcal, onRefresh }) {
-  const stableClose = useCallback(onClose, [onClose])
-  useAutoClose(stableClose)
+  useAutoClose(onClose)
   const [rooms, setRooms] = useState([])
   const [selectedRoom, setSelectedRoom] = useState(localStorage.getItem('gcal_room_id') || '')
   const [selectedRoomName, setSelectedRoomName] = useState(localStorage.getItem('gcal_room_name') || '')
@@ -54,7 +54,7 @@ export default function SettingsModal({ onClose, onSave, gcal, onRefresh }) {
                 Refresh
               </button>
             )}
-            <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none">×</button>
+            <TimerCloseButton onClick={onClose} />
           </div>
         </div>
 

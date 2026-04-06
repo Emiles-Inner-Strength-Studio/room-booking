@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useAutoClose } from './useAutoClose'
+import TimerCloseButton from './TimerCloseButton'
 import QrModal from './QrModal'
 
 export default function EventDetailModal({ event, onClose, onCancel }) {
@@ -23,8 +24,7 @@ export default function EventDetailModal({ event, onClose, onCancel }) {
     ? `mailto:${attendees.map(a => a.email).join(',')}?subject=${encodeURIComponent(event.summary || 'Meeting')}`
     : null
 
-  const stableClose = useCallback(onClose, [onClose])
-  useAutoClose(stableClose)
+  useAutoClose(onClose)
 
   return (
     <>
@@ -40,7 +40,7 @@ export default function EventDetailModal({ event, onClose, onCancel }) {
                   {fmt(start)} → {fmt(end)} · {durationLabel}
                 </p>
               </div>
-              <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center flex-shrink-0">×</button>
+              <TimerCloseButton onClick={onClose} />
             </div>
           </div>
 

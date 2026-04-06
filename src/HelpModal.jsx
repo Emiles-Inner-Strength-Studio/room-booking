@@ -1,16 +1,15 @@
-import { useCallback } from 'react'
 import { useAutoClose } from './useAutoClose'
+import TimerCloseButton from './TimerCloseButton'
 
 export default function HelpModal({ onClose, roomName }) {
-  const stableClose = useCallback(onClose, [onClose])
-  useAutoClose(stableClose)
+  useAutoClose(onClose)
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
       <div className="bg-slate-800 rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden">
 
         <div className="px-8 pt-8 pb-6 border-b border-slate-700 flex justify-between items-center">
           <h2 className="text-white text-2xl font-bold">How to use</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center">×</button>
+          <TimerCloseButton onClick={onClose} />
         </div>
 
         <div className="px-8 py-6 space-y-6">

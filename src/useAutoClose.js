@@ -1,10 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
-const AUTO_CLOSE_MS = 30000
+export const AUTO_CLOSE_MS = 30000
 
 export function useAutoClose(onClose) {
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
   useEffect(() => {
-    const timer = setTimeout(onClose, AUTO_CLOSE_MS)
+    const timer = setTimeout(() => onCloseRef.current(), AUTO_CLOSE_MS)
     return () => clearTimeout(timer)
-  }, [onClose])
+  }, [])
 }
