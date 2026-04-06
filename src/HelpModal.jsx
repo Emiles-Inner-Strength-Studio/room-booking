@@ -49,7 +49,7 @@ export default function HelpModal({ onClose, roomName }) {
         </div>
 
         <div className="px-8 pb-8">
-          <TimerCloseButton onClick={onClose}>Got it</TimerCloseButton>
+          <TimerCloseButton onClick={onClose} className="w-full">Got it</TimerCloseButton>
         </div>
       </div>
     </div>

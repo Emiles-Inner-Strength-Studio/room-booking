@@ -7,9 +7,10 @@ export default function SettingsModal({ onClose, onSave, gcal, onRefresh }) {
   const [selectedRoom, setSelectedRoom] = useState(localStorage.getItem('gcal_room_id') || '')
   const [selectedRoomName, setSelectedRoomName] = useState(localStorage.getItem('gcal_room_name') || '')
   const [loadingRooms, setLoadingRooms] = useState(false)
-  const [apiKey, setApiKey] = useState(localStorage.getItem('gcal_api_key_backend') || '')
-  const [showApiKey, setShowApiKey] = useState(false)
-  const [apiKeyStatus, setApiKeyStatus] = useState(null) // null | 'checking' | 'valid' | 'invalid' | 'error'
+  const savedKey = localStorage.getItem('gcal_api_key_backend') || ''
+  const [apiKey, setApiKey] = useState(savedKey)
+  const [apiKeyStatus, setApiKeyStatus] = useState(savedKey ? 'saved' : null) // null | 'checking' | 'valid' | 'invalid' | 'error' | 'saved'
+  const [editing, setEditing] = useState(!savedKey)
   const [apiKeyError, setApiKeyError] = useState(null)
   const [roomsError, setRoomsError] = useState(null)
 
@@ -113,78 +114,78 @@ export default function SettingsModal({ onClose, onSave, gcal, onRefresh }) {
         {gcal.isBackend && (
           <div className="space-y-3">
             <h3 className="text-slate-400 text-sm font-medium uppercase tracking-wide">API Key</h3>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <input
-                  type={showApiKey ? 'text' : 'password'}
-                  value={apiKey}
-                  onChange={e => { setApiKey(e.target.value); setApiKeyStatus(null) }}
-                  placeholder="Enter API key"
-                  className={`w-full bg-slate-700 text-white text-sm rounded-lg px-3 py-2 pr-16 border focus:outline-none placeholder-slate-500 ${
-                    apiKeyStatus === 'valid' ? 'border-green-500' :
-                    apiKeyStatus === 'invalid' ? 'border-red-500' :
-                    apiKeyStatus === 'error' ? 'border-amber-500' :
-                    'border-slate-600 focus:border-blue-500'
-                  }`}
-                />
+            {editing ? (
+              <>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={e => { setApiKey(e.target.value); setApiKeyStatus(null) }}
+                    placeholder="Enter API key"
+                    className={`flex-1 bg-slate-700 text-white text-sm rounded-lg px-3 py-2 border focus:outline-none placeholder-slate-500 ${
+                      apiKeyStatus === 'invalid' ? 'border-red-500' :
+                      apiKeyStatus === 'error' ? 'border-amber-500' :
+                      'border-slate-600 focus:border-blue-500'
+                    }`}
+                  />
+                  <button
+                    disabled={apiKeyStatus === 'checking'}
+                    onClick={async () => {
+                      if (apiKey) {
+                        localStorage.setItem('gcal_api_key_backend', apiKey)
+                      } else {
+                        localStorage.removeItem('gcal_api_key_backend')
+                      }
+                      setApiKeyStatus('checking')
+                      setApiKeyError(null)
+                      try {
+                        const res = await fetch('/api/rooms', {
+                          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+                        })
+                        if (res.ok) {
+                          setApiKeyStatus('valid')
+                          setEditing(false)
+                          onRefresh?.()
+                        } else if (res.status === 401) {
+                          setApiKeyStatus('invalid')
+                        } else {
+                          const data = await res.json().catch(() => ({}))
+                          setApiKeyStatus('error')
+                          setApiKeyError(data.error || `Server error (${res.status})`)
+                        }
+                      } catch (e) {
+                        setApiKeyStatus('error')
+                        setApiKeyError(e.message || 'Could not reach server')
+                      }
+                    }}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                  >
+                    {apiKeyStatus === 'checking' ? '...' : 'Save'}
+                  </button>
+                </div>
+                {apiKeyStatus === 'invalid' && (
+                  <p className="text-red-400 text-xs">Invalid API key. Check the key and try again.</p>
+                )}
+                {apiKeyStatus === 'error' && (
+                  <div className="space-y-1">
+                    <p className="text-amber-400 text-xs">API key saved, but the server returned an error:</p>
+                    <p className="text-red-400 text-xs font-mono bg-slate-900/50 rounded px-2 py-1">{apiKeyError}</p>
+                  </div>
+                )}
+                {!apiKeyStatus && (
+                  <p className="text-slate-500 text-xs">Required to authenticate with the backend. Set once per kiosk.</p>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="text-green-400 text-sm">API key configured</span>
                 <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs transition-colors"
+                  onClick={() => { setApiKey(''); setApiKeyStatus(null); setEditing(true) }}
+                  className="text-slate-400 hover:text-white text-sm underline transition-colors"
                 >
-                  {showApiKey ? 'Hide' : 'Show'}
+                  Re-enter
                 </button>
               </div>
-              <button
-                disabled={apiKeyStatus === 'checking'}
-                onClick={async () => {
-                  if (apiKey) {
-                    localStorage.setItem('gcal_api_key_backend', apiKey)
-                  } else {
-                    localStorage.removeItem('gcal_api_key_backend')
-                  }
-                  setApiKeyStatus('checking')
-                  setApiKeyError(null)
-                  try {
-                    const res = await fetch('/api/rooms', {
-                      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
-                    })
-                    if (res.ok) {
-                      setApiKeyStatus('valid')
-                      onRefresh?.()
-                    } else if (res.status === 401) {
-                      setApiKeyStatus('invalid')
-                    } else {
-                      // Key accepted (not 401) but server had another error
-                      const data = await res.json().catch(() => ({}))
-                      setApiKeyStatus('error')
-                      setApiKeyError(data.error || `Server error (${res.status})`)
-                      // Key itself is fine — keep it saved
-                    }
-                  } catch (e) {
-                    setApiKeyStatus('error')
-                    setApiKeyError(e.message || 'Could not reach server')
-                  }
-                }}
-                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-              >
-                {apiKeyStatus === 'checking' ? '...' : 'Save'}
-              </button>
-            </div>
-            {apiKeyStatus === 'valid' && (
-              <p className="text-green-400 text-xs">API key saved and verified.</p>
-            )}
-            {apiKeyStatus === 'invalid' && (
-              <p className="text-red-400 text-xs">Invalid API key. Check the key and try again.</p>
-            )}
-            {apiKeyStatus === 'error' && (
-              <div className="space-y-1">
-                <p className="text-amber-400 text-xs">API key saved, but the server returned an error:</p>
-                <p className="text-red-400 text-xs font-mono bg-slate-900/50 rounded px-2 py-1">{apiKeyError}</p>
-              </div>
-            )}
-            {!apiKeyStatus && (
-              <p className="text-slate-500 text-xs">Required to authenticate with the backend. Set once per kiosk.</p>
             )}
           </div>
         )}
