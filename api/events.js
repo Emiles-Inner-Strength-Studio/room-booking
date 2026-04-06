@@ -23,7 +23,17 @@ export default async function handler(req, res) {
       if (typeof eventId !== 'string' || eventId.length > 1024) {
         return res.status(400).json({ error: 'Invalid eventId' })
       }
-      await calendar.events.delete({ calendarId, eventId })
+      // Try deleting from the service account's own calendar first (where bookings are created),
+      // then fall back to the room calendar
+      try {
+        await calendar.events.delete({ calendarId: 'primary', eventId })
+      } catch (primaryErr) {
+        if (primaryErr.code === 404 || primaryErr.code === 403) {
+          await calendar.events.delete({ calendarId, eventId })
+        } else {
+          throw primaryErr
+        }
+      }
       return res.status(200).json({ ok: true })
     }
 
