@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useAutoClose } from './useAutoClose'
 
 const DURATIONS = [
   { label: '15m', minutes: 15 },
@@ -23,6 +24,9 @@ export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) 
   const hasUntilNextPreset = maxMinutes != null && !DURATIONS.some(d => d.minutes === maxMinutes) && maxMinutes >= 5
   const defaultAvailable = maxMinutes == null || DEFAULT_DURATION <= maxMinutes
   const isConstrained = hasUntilNextPreset && !defaultAvailable
+
+  const stableClose = useCallback(onClose, [onClose])
+  useAutoClose(stableClose)
 
   const [title, setTitle] = useState('Instant Meeting')
   const [duration, setDuration] = useState(defaultAvailable ? DEFAULT_DURATION : (hasUntilNextPreset ? maxMinutes : DEFAULT_DURATION))

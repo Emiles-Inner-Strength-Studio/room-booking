@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useAutoClose } from './useAutoClose'
 
 export default function SettingsModal({ onClose, onSave, gcal, onRefresh }) {
+  const stableClose = useCallback(onClose, [onClose])
+  useAutoClose(stableClose)
   const [rooms, setRooms] = useState([])
   const [selectedRoom, setSelectedRoom] = useState(localStorage.getItem('gcal_room_id') || '')
   const [selectedRoomName, setSelectedRoomName] = useState(localStorage.getItem('gcal_room_name') || '')

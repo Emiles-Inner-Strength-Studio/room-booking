@@ -1,4 +1,9 @@
+import { useCallback } from 'react'
+import { useAutoClose } from './useAutoClose'
+
 export default function HelpModal({ onClose, roomName }) {
+  const stableClose = useCallback(onClose, [onClose])
+  useAutoClose(stableClose)
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
       <div className="bg-slate-800 rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden">
