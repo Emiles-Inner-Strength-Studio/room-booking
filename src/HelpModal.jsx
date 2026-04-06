@@ -9,7 +9,7 @@ export default function HelpModal({ onClose, roomName }) {
 
         <div className="px-8 pt-8 pb-6 border-b border-slate-700 flex justify-between items-center">
           <h2 className="text-white text-2xl font-bold">How to use</h2>
-          <TimerCloseButton onClick={onClose} />
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center">×</button>
         </div>
 
         <div className="px-8 py-6 space-y-6">
@@ -49,12 +49,7 @@ export default function HelpModal({ onClose, roomName }) {
         </div>
 
         <div className="px-8 pb-8">
-          <button
-            onClick={onClose}
-            className="w-full bg-slate-700 hover:bg-slate-600 text-white rounded-2xl py-4 font-semibold text-lg transition-colors"
-          >
-            Got it
-          </button>
+          <TimerCloseButton onClick={onClose}>Got it</TimerCloseButton>
         </div>
       </div>
     </div>

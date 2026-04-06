@@ -21,7 +21,7 @@ export default function QrModal({ url, onClose }) {
       <div className="bg-slate-800 rounded-3xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="px-8 pt-8 pb-4 flex justify-between items-center">
           <h2 className="text-white text-2xl font-bold">Email Participants</h2>
-          <TimerCloseButton onClick={onClose} />
+          <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center">×</button>
         </div>
         <div className="px-8 pb-6 flex flex-col items-center gap-4">
           {dataUrl ? (
@@ -32,12 +32,7 @@ export default function QrModal({ url, onClose }) {
           <p className="text-slate-400 text-base">Scan with your phone to send email</p>
         </div>
         <div className="px-8 pb-8">
-          <button
-            onClick={onClose}
-            className="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-4 text-xl font-semibold transition-colors"
-          >
-            Close
-          </button>
+          <TimerCloseButton onClick={onClose} />
         </div>
       </div>
     </div>

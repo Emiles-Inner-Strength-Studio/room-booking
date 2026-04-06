@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAutoClose } from './useAutoClose'
-import TimerCloseButton from './TimerCloseButton'
 import QrModal from './QrModal'
+import TimerCloseButton from './TimerCloseButton'
 
 export default function EventDetailModal({ event, onClose, onCancel }) {
   const start = new Date(event.start.dateTime || event.start.date)
@@ -40,7 +40,7 @@ export default function EventDetailModal({ event, onClose, onCancel }) {
                   {fmt(start)} → {fmt(end)} · {durationLabel}
                 </p>
               </div>
-              <TimerCloseButton onClick={onClose} />
+              <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center flex-shrink-0">×</button>
             </div>
           </div>
 
@@ -118,12 +118,7 @@ export default function EventDetailModal({ event, onClose, onCancel }) {
                 Email Participants
               </button>
             )}
-            <button
-              onClick={onClose}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-5 text-xl font-semibold transition-colors"
-            >
-              Close
-            </button>
+            <TimerCloseButton onClick={onClose} />
           </div>
         </div>
       </div>

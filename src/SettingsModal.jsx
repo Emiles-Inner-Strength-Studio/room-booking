@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useAutoClose } from './useAutoClose'
-import TimerCloseButton from './TimerCloseButton'
 
 export default function SettingsModal({ onClose, onSave, gcal, onRefresh }) {
   useAutoClose(onClose)
@@ -54,7 +53,7 @@ export default function SettingsModal({ onClose, onSave, gcal, onRefresh }) {
                 Refresh
               </button>
             )}
-            <TimerCloseButton onClick={onClose} />
+            <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none">×</button>
           </div>
         </div>
 

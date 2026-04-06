@@ -1,37 +1,24 @@
 import { AUTO_CLOSE_MS } from './useAutoClose'
 
-export default function TimerCloseButton({ onClick }) {
+export default function TimerCloseButton({ onClick, children = 'Close', className = '' }) {
   const seconds = AUTO_CLOSE_MS / 1000
-  // SVG circle: radius 18, circumference ~113.1
-  const r = 18
-  const circ = 2 * Math.PI * r
 
   return (
     <button
       onClick={onClick}
-      className="relative w-10 h-10 flex items-center justify-center flex-shrink-0 group"
-      title="Close"
+      className={`relative flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-5 text-xl font-semibold transition-colors overflow-hidden ${className}`}
     >
-      <svg className="absolute inset-0 w-10 h-10 -rotate-90" viewBox="0 0 40 40">
-        {/* Background ring */}
-        <circle cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-700" />
-        {/* Animated ring */}
-        <circle
-          cx="20" cy="20" r={r} fill="none" stroke="currentColor" strokeWidth="2"
-          className="text-slate-400"
-          strokeDasharray={circ}
-          strokeDashoffset="0"
-          strokeLinecap="round"
-          style={{
-            animation: `timer-ring ${seconds}s linear forwards`,
-          }}
-        />
-      </svg>
-      <span className="relative text-slate-500 group-hover:text-white text-2xl leading-none transition-colors">×</span>
+      <span className="relative">{children}</span>
+      <div
+        className="absolute bottom-0 left-0 h-0.5 bg-slate-400 rounded-full"
+        style={{
+          animation: `timer-bar ${seconds}s linear forwards`,
+        }}
+      />
       <style>{`
-        @keyframes timer-ring {
-          from { stroke-dashoffset: 0; }
-          to { stroke-dashoffset: ${circ}; }
+        @keyframes timer-bar {
+          from { width: 100%; }
+          to { width: 0%; }
         }
       `}</style>
     </button>

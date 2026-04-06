@@ -77,7 +77,7 @@ export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) 
                 {fmt(startTime)} → {fmt(endTime)} · {effectiveDuration}m
               </p>
             </div>
-            <TimerCloseButton onClick={onClose} />
+            <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center">×</button>
           </div>
         </div>
 
@@ -165,12 +165,7 @@ export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) 
 
         {/* Actions */}
         <div className="px-8 pb-8 flex gap-4">
-          <button
-            onClick={onClose}
-            className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-5 text-xl font-semibold transition-colors"
-          >
-            Cancel
-          </button>
+          <TimerCloseButton onClick={onClose}>Cancel</TimerCloseButton>
           <button
             onClick={handleConfirm}
             disabled={!title.trim() || effectiveDuration < 5 || loading}
