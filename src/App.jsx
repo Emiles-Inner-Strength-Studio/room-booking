@@ -359,15 +359,9 @@ export default function App() {
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
           onCancel={async (event) => {
-            try {
-              await gcal.deleteEvent(roomId, event.id)
-              setSelectedEvent(null)
-              await loadEvents()
-              startRefreshCycle(true)
-            } catch (e) {
-              console.error('Failed to cancel meeting', e)
-              setBackendError(e.message || 'Failed to cancel meeting')
-            }
+            await gcal.deleteEvent(roomId, event.id)
+            await loadEvents()
+            startRefreshCycle(true)
           }}
         />
       )}

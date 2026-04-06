@@ -19,6 +19,9 @@ export default function EventDetailModal({ event, onClose, onCancel }) {
   const attendees = (event.attendees || []).filter(a => !a.resource && !a.self)
   const isInstantMeeting = event.summary === 'Instant Meeting'
   const [showQr, setShowQr] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelled, setCancelled] = useState(false)
+  const [cancelError, setCancelError] = useState(null)
 
   const mailtoUrl = attendees.length > 0
     ? `mailto:${attendees.map(a => a.email).join(',')}?subject=${encodeURIComponent(event.summary || 'Meeting')}`
@@ -101,25 +104,51 @@ export default function EventDetailModal({ event, onClose, onCancel }) {
           </div>
 
           {/* Actions */}
-          <div className="px-8 pb-8 flex gap-4">
-            {onCancel && isInstantMeeting && (
-              <button
-                onClick={() => onCancel(event)}
-                className="flex-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 rounded-2xl py-5 text-xl font-semibold transition-colors"
-              >
-                Cancel Meeting
-              </button>
-            )}
-            {mailtoUrl && (
-              <button
-                onClick={() => setShowQr(true)}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-5 text-xl font-semibold transition-colors"
-              >
-                Email Participants
-              </button>
-            )}
-            <TimerCloseButton onClick={onClose} />
-          </div>
+          {cancelled ? (
+            <div className="px-8 pb-8 space-y-4">
+              <div className="bg-green-500/10 border border-green-500/30 rounded-2xl px-6 py-5 text-center">
+                <p className="text-green-400 text-xl font-semibold">Meeting cancelled</p>
+                <p className="text-slate-400 text-base mt-1">The room is now available</p>
+              </div>
+              <TimerCloseButton onClick={onClose} className="w-full" />
+            </div>
+          ) : (
+            <div className="px-8 pb-8 space-y-3">
+              {cancelError && (
+                <p className="text-red-400 text-base">{cancelError}</p>
+              )}
+              <div className="flex gap-4">
+                {onCancel && isInstantMeeting && (
+                  <button
+                    onClick={async () => {
+                      setCancelling(true)
+                      setCancelError(null)
+                      try {
+                        await onCancel(event)
+                        setCancelled(true)
+                      } catch (e) {
+                        setCancelError(e.message || 'Failed to cancel meeting')
+                      }
+                      setCancelling(false)
+                    }}
+                    disabled={cancelling}
+                    className="flex-1 bg-red-500/20 hover:bg-red-500/30 disabled:opacity-50 text-red-400 border border-red-500/40 rounded-2xl py-5 text-xl font-semibold transition-colors"
+                  >
+                    {cancelling ? 'Cancelling...' : 'Cancel Meeting'}
+                  </button>
+                )}
+                {mailtoUrl && (
+                  <button
+                    onClick={() => setShowQr(true)}
+                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-2xl py-5 text-xl font-semibold transition-colors"
+                  >
+                    Email Participants
+                  </button>
+                )}
+                <TimerCloseButton onClick={onClose} />
+              </div>
+            </div>
+          )}
         </div>
       </div>
       {showQr && mailtoUrl && (
