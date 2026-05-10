@@ -37,14 +37,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true })
     }
 
-    const now = new Date()
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
-    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+    const timeZone = req.query.timeZone || 'UTC'
+    if (!/^[A-Za-z_\/]+$/.test(timeZone)) {
+      return res.status(400).json({ error: 'Invalid timeZone' })
+    }
+    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    const todayStr = fmt.format(new Date())
 
     const result = await calendar.events.list({
       calendarId,
-      timeMin: startOfDay.toISOString(),
-      timeMax: endOfDay.toISOString(),
+      timeMin: `${todayStr}T00:00:00`,
+      timeMax: `${todayStr}T23:59:59`,
+      timeZone,
       singleEvents: true,
       orderBy: 'startTime',
     })

@@ -70,7 +70,8 @@ async function backendListRooms() {
 }
 
 async function backendGetTodayEvents(calendarId) {
-  const res = await fetch(`/api/events?calendarId=${encodeURIComponent(calendarId)}`, {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const res = await fetch(`/api/events?calendarId=${encodeURIComponent(calendarId)}&timeZone=${encodeURIComponent(tz)}`, {
     headers: getApiKeyHeader(),
   })
   if (!res.ok) throw new Error(`events: ${res.status}`)
