@@ -321,7 +321,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Not signed in */}
+      {/* Not signed in / needs setup */}
       {!gcal.authed ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
           <div className="text-center space-y-3">
@@ -336,17 +336,44 @@ export default function App() {
             Sign in with Google
           </button>
           {gcal.error && <p className="text-red-400 text-base">{gcal.error}</p>}
-          {localStorage.getItem('gcal_force_sso') === '1' && (
+          <div className="flex items-center gap-4">
+            {localStorage.getItem('gcal_force_sso') === '1' && (
+              <button
+                onClick={() => {
+                  localStorage.removeItem('gcal_force_sso')
+                  window.location.reload()
+                }}
+                className="text-slate-500 hover:text-slate-300 text-sm underline transition-colors"
+              >
+                Switch to Service Account
+              </button>
+            )}
             <button
-              onClick={() => {
-                localStorage.removeItem('gcal_force_sso')
-                window.location.reload()
-              }}
-              className="text-slate-500 hover:text-slate-300 text-sm underline transition-colors"
+              onClick={() => setShowSettings(true)}
+              className="text-slate-500 hover:text-slate-300 transition-colors"
+              title="Settings"
             >
-              Switch to Service Account
+              <GearIcon />
             </button>
-          )}
+          </div>
+        </div>
+      ) : gcal.isBackend && (!localStorage.getItem('gcal_api_key_backend') || !roomId) ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-8 px-8">
+          <div className="text-center space-y-3">
+            <p className="text-slate-200 text-2xl font-semibold">Set Up This Display</p>
+            <p className="text-slate-500 text-base">
+              {!localStorage.getItem('gcal_api_key_backend')
+                ? 'Enter the API key and select a room to get started'
+                : 'Select a room to display'}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="flex items-center gap-3 bg-blue-600 hover:bg-blue-500 text-white font-bold px-8 py-4 rounded-2xl text-xl shadow-lg transition-colors"
+          >
+            <GearIcon />
+            Open Settings
+          </button>
         </div>
       ) : (
         /* Two-column layout */
