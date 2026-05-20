@@ -259,7 +259,7 @@ export default function App() {
   const timeRemaining = currentEnd ? currentEnd - now : null
 
   const meetingCode = getMeetingCode(current)
-  const { participants } = useMeetParticipants(meetingCode, currentStart, currentEnd)
+  const { participants } = useMeetParticipants(meetingCode, currentStart, currentEnd, gcal.isBackend)
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-900 text-white overflow-hidden">
@@ -395,24 +395,35 @@ export default function App() {
                     </>
                   )}
                   {participants.length > 0 && (
-                    <div className="mt-4 flex items-center gap-2 flex-wrap">
-                      <div className="flex -space-x-2">
-                        {participants.slice(0, 5).map((p, i) => (
-                          <div
-                            key={i}
-                            className="w-9 h-9 rounded-full bg-slate-600 border-2 border-slate-800 flex items-center justify-center text-xs font-bold text-white"
-                            title={p.displayName}
-                          >
-                            {p.displayName.charAt(0).toUpperCase()}
-                          </div>
-                        ))}
+                    <div className="mt-6 bg-slate-800/60 rounded-2xl px-5 py-4 border border-slate-700/50">
+                      <div className="flex items-center gap-2 mb-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400">
+                          <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                        </svg>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-green-400">{participants.length} in video call</span>
                       </div>
-                      <span className="text-slate-400 text-sm">
-                        {participants.length <= 5
-                          ? participants.map(p => p.displayName.split(' ')[0]).join(', ')
-                          : `${participants.slice(0, 3).map(p => p.displayName.split(' ')[0]).join(', ')} +${participants.length - 3} more`
-                        }
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <div className="flex -space-x-2.5">
+                          {participants.slice(0, 6).map((p, i) => (
+                            <div
+                              key={i}
+                              className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-500 to-slate-700 border-2 border-slate-800 flex items-center justify-center text-xs font-bold text-white shadow-sm"
+                              title={p.displayName}
+                            >
+                              {p.displayName.charAt(0).toUpperCase()}
+                            </div>
+                          ))}
+                          {participants.length > 6 && (
+                            <div className="w-8 h-8 rounded-full bg-slate-700 border-2 border-slate-800 flex items-center justify-center text-xs font-medium text-slate-400">
+                              +{participants.length - 6}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-slate-400 text-sm truncate">
+                          {participants.slice(0, 3).map(p => p.displayName.split(' ')[0]).join(', ')}
+                          {participants.length > 3 && ` & ${participants.length - 3} more`}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </>

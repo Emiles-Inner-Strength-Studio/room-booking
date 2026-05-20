@@ -45,8 +45,8 @@ export default async function handler(req, res) {
 
     res.status(200).json({ participants })
   } catch (e) {
-    // 404 = meeting not found or not started yet — not an error
-    if (e.code === 404 || e.status === 404) {
+    // 404 = meeting not found, 403 = scope not configured yet — not fatal
+    if (e.code === 404 || e.status === 404 || e.code === 403 || e.status === 403) {
       return res.status(200).json({ participants: [] })
     }
     console.error('meet-participants error:', e.message)

@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { MEET_EARLY_POLL_INTERVAL, MEET_NORMAL_POLL_INTERVAL, MEET_EARLY_PHASE_DURATION } from './config'
 
+const MEET_API_BASE = 'https://meet.googleapis.com/v2'
+
 const getApiKeyHeader = () => {
   const key = localStorage.getItem('gcal_api_key_backend')
   return key ? { Authorization: `Bearer ${key}` } : {}
 }
 
-async function fetchParticipants(meetingCode) {
+// Backend mode: call our serverless endpoint
+async function fetchParticipantsBackend(meetingCode) {
   const res = await fetch(`/api/meet-participants?meetingCode=${encodeURIComponent(meetingCode)}`, {
     headers: getApiKeyHeader(),
   })
@@ -15,13 +18,49 @@ async function fetchParticipants(meetingCode) {
   return data.participants || []
 }
 
+// OAuth mode: call Meet REST API directly with user's access token
+async function fetchParticipantsOAuth(meetingCode) {
+  const token = window.gapi?.client?.getToken()?.access_token
+  if (!token) return []
+
+  try {
+    // Find active conference for this meeting code
+    const confRes = await fetch(
+      `${MEET_API_BASE}/conferenceRecords?filter=${encodeURIComponent(`space.meeting_code="${meetingCode}" AND end_time IS NULL`)}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    if (!confRes.ok) return []
+    const confData = await confRes.json()
+    const records = confData.conferenceRecords || []
+    if (records.length === 0) return []
+
+    const conferenceRecord = records[0].name
+
+    // List active participants
+    const partRes = await fetch(
+      `${MEET_API_BASE}/${conferenceRecord}/participants?filter=${encodeURIComponent('latest_end_time IS NULL')}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    )
+    if (!partRes.ok) return []
+    const partData = await partRes.json()
+
+    return (partData.participants || []).map(p => ({
+      displayName: p.signedinUser?.displayName || p.anonymousUser?.displayName || p.phoneUser?.displayName || 'Unknown',
+      type: p.signedinUser ? 'user' : p.anonymousUser ? 'anonymous' : 'phone',
+    }))
+  } catch {
+    return []
+  }
+}
+
 /**
  * Poll Google Meet for active participants in a call.
  * - Starts polling at eventStart
  * - Polls every 15s for the first 5 minutes, then every 30s
  * - Stops when eventEnd is reached or meetingCode is null
+ * - Works in both backend (service account) and OAuth (client-side) modes
  */
-export function useMeetParticipants(meetingCode, eventStart, eventEnd) {
+export function useMeetParticipants(meetingCode, eventStart, eventEnd, isBackend = true) {
   const [participants, setParticipants] = useState([])
   const intervalRef = useRef(null)
   const timeoutRef = useRef(null)
@@ -47,7 +86,9 @@ export function useMeetParticipants(meetingCode, eventStart, eventEnd) {
 
     const poll = async () => {
       if (!active) return
-      const result = await fetchParticipants(meetingCode)
+      const result = isBackend
+        ? await fetchParticipantsBackend(meetingCode)
+        : await fetchParticipantsOAuth(meetingCode)
       if (active) setParticipants(result)
     }
 
@@ -97,7 +138,7 @@ export function useMeetParticipants(meetingCode, eventStart, eventEnd) {
       clearTimeout(phaseTimeoutRef.current)
       clearTimeout(stopTimer)
     }
-  }, [meetingCode, eventStart?.getTime(), eventEnd?.getTime()])
+  }, [meetingCode, eventStart?.getTime(), eventEnd?.getTime(), isBackend])
 
   return { participants }
 }

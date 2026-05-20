@@ -20,7 +20,7 @@ export const WORK_DAY_START_HOUR = 8
 
 // ── Google API (client-side) ──
 
-export const SCOPES = 'https://www.googleapis.com/auth/calendar'
+export const SCOPES = 'https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/meetings.space.readonly'
 export const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'
 export const TOKEN_KEY = 'gcal_token'
 export const TOKEN_REFRESH_INTERVAL_MS = 30 * 60 * 1000
