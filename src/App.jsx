@@ -259,7 +259,7 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  <p className="text-white text-6xl font-bold leading-tight">{effectiveCurrent.summary}</p>
+                  <p className="text-white text-6xl font-bold leading-tight">{effectiveCurrent.summary || 'Private event'}</p>
                   {effectiveCurrent._optimistic ? (
                     <p className="text-slate-400 text-xl">Just booked</p>
                   ) : (
@@ -318,7 +318,7 @@ export default function App() {
                         </div>
                         <div className={`w-0.5 h-10 rounded-full flex-shrink-0 ${isNow ? 'bg-red-500' : 'bg-slate-600'}`} />
                         <div className="flex-1 min-w-0">
-                          <div className={`text-base font-medium truncate ${isNow ? 'text-white' : 'text-slate-200'}`}>{event.summary}</div>
+                          <div className={`text-base font-medium truncate ${isNow ? 'text-white' : 'text-slate-200'}`}>{event.summary || 'Private event'}</div>
                           <div className="text-xs text-slate-500 mt-0.5">{formatDuration(end - start)}</div>
                         </div>
                         {isNow && <div className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />}
