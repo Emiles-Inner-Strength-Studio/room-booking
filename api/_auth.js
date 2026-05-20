@@ -1,5 +1,6 @@
 import { google } from 'googleapis'
 import { timingSafeEqual } from 'crypto'
+import { RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX } from './_config.js'
 
 let _cachedCalendarClient = null
 let _cachedMeetClient = null
@@ -79,8 +80,6 @@ export function securityHeaders(res) {
  * basic protection against abuse within a single warm instance.
  */
 const rateLimitStore = new Map()
-const RATE_LIMIT_WINDOW_MS = 60_000 // 1 minute
-const RATE_LIMIT_MAX = 60           // 60 requests per minute per IP
 
 export function rateLimit(req, res) {
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || 'unknown'

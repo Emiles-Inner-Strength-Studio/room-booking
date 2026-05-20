@@ -9,15 +9,15 @@ import EventDetailModal from './EventDetailModal'
 import DatePickerModal from './DatePickerModal'
 import FreeRoomModal from './FreeRoomModal'
 import { MOCK_ROOM_NAME } from './mockData'
-
-const TIME_TRAVEL_TIMEOUT_MS = 30000
-const WORK_DAY_START_HOUR = 8
-
-const MIN_UPTIME_FOR_RELOAD = 5 * 60000
-const REFRESH_INTERVAL = 30000
-const POST_BOOK_RAPID_INTERVAL = 1000
-const POST_BOOK_RAPID_DURATION = 15000
-const OPTIMISTIC_IN_USE_DURATION = 15000
+import {
+  TIME_TRAVEL_TIMEOUT_MS,
+  WORK_DAY_START_HOUR,
+  MIN_UPTIME_FOR_RELOAD,
+  REFRESH_INTERVAL,
+  POST_BOOK_RAPID_INTERVAL,
+  POST_BOOK_RAPID_DURATION,
+  OPTIMISTIC_IN_USE_DURATION,
+} from './config'
 
 function formatTime(date) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })

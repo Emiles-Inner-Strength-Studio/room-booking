@@ -1,8 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-
-const EARLY_POLL_INTERVAL = 15000  // 15s for first 5 min
-const NORMAL_POLL_INTERVAL = 30000 // 30s after that
-const EARLY_PHASE_DURATION = 5 * 60000 // 5 minutes
+import { MEET_EARLY_POLL_INTERVAL, MEET_NORMAL_POLL_INTERVAL, MEET_EARLY_PHASE_DURATION } from './config'
 
 const getApiKeyHeader = () => {
   const key = localStorage.getItem('gcal_api_key_backend')
@@ -57,8 +54,8 @@ export function useMeetParticipants(meetingCode, eventStart, eventEnd) {
     const startPolling = () => {
       if (!active) return
       const elapsed = Date.now() - startMs
-      const isEarlyPhase = elapsed < EARLY_PHASE_DURATION
-      const interval = isEarlyPhase ? EARLY_POLL_INTERVAL : NORMAL_POLL_INTERVAL
+      const isEarlyPhase = elapsed < MEET_EARLY_PHASE_DURATION
+      const interval = isEarlyPhase ? MEET_EARLY_POLL_INTERVAL : MEET_NORMAL_POLL_INTERVAL
 
       // Initial fetch
       poll()
@@ -68,11 +65,11 @@ export function useMeetParticipants(meetingCode, eventStart, eventEnd) {
 
       // If in early phase, schedule switch to normal interval
       if (isEarlyPhase) {
-        const remaining = EARLY_PHASE_DURATION - elapsed
+        const remaining = MEET_EARLY_PHASE_DURATION - elapsed
         phaseTimeoutRef.current = setTimeout(() => {
           if (!active) return
           clearInterval(intervalRef.current)
-          intervalRef.current = setInterval(poll, NORMAL_POLL_INTERVAL)
+          intervalRef.current = setInterval(poll, MEET_NORMAL_POLL_INTERVAL)
         }, remaining)
       }
     }

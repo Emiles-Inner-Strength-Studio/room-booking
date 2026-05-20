@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
+import { AUTO_CLOSE_MS } from './config'
 
-export const AUTO_CLOSE_MS = 30000
+export { AUTO_CLOSE_MS }
 
 export function useAutoClose(onClose) {
   const onCloseRef = useRef(onClose)

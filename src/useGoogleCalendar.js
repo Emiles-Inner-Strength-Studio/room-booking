@@ -10,14 +10,14 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getMockEvents, MOCK_ROOMS } from './mockData'
-
-const SCOPES = 'https://www.googleapis.com/auth/calendar'
-const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'
-const TOKEN_KEY = 'gcal_token'
-const REFRESH_INTERVAL_MS = 30 * 60 * 1000 // refresh every 30 min
-
-const DEFAULT_API_KEY = 'AIzaSyDP9bt-G0tgBNWGIoxYMV7vNxx-lT3I4JM'
-const DEFAULT_CLIENT_ID = '961612899421-hkrid21kugiikch6lul2kuqo004ekj6p.apps.googleusercontent.com'
+import {
+  SCOPES,
+  DISCOVERY_DOC,
+  TOKEN_KEY,
+  TOKEN_REFRESH_INTERVAL_MS,
+  DEFAULT_API_KEY,
+  DEFAULT_CLIENT_ID,
+} from './config'
 
 const getClientId = () => localStorage.getItem('gcal_client_id') || DEFAULT_CLIENT_ID
 const getApiKey = () => localStorage.getItem('gcal_api_key') || DEFAULT_API_KEY
@@ -125,7 +125,7 @@ export function useGoogleCalendar() {
 
     const scheduleNextRefresh = (silentRefreshFn) => {
       if (refreshTimer) clearInterval(refreshTimer)
-      refreshTimer = setInterval(silentRefreshFn, REFRESH_INTERVAL_MS)
+      refreshTimer = setInterval(silentRefreshFn, TOKEN_REFRESH_INTERVAL_MS)
       console.log('[gcal] refresh interval set: every 30min')
     }
 
