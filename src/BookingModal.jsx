@@ -7,8 +7,6 @@ const DURATIONS = [
   { label: '30m', minutes: 30 },
   { label: '45m', minutes: 45 },
   { label: '1h',  minutes: 60 },
-  { label: '1.5h', minutes: 90 },
-  { label: '2h',  minutes: 120 },
 ]
 
 function formatDurationLabel(mins) {
@@ -97,7 +95,7 @@ export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) 
           {/* Duration */}
           <div>
             <label className="text-slate-400 text-sm font-medium uppercase tracking-wide mb-3 block">Duration</label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-4 gap-3">
               {DURATIONS.map(d => {
                 const disabled = maxMinutes != null && d.minutes > maxMinutes
                 return (
@@ -117,7 +115,7 @@ export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) 
                   </button>
                 )
               })}
-              <div className={`col-span-3 flex items-center transition-all duration-300 ${showCustom ? 'gap-3' : 'gap-0'}`}>
+              <div className={`col-span-4 flex items-center transition-all duration-300 ${showCustom ? 'gap-3' : 'gap-0'}`}>
                 <button
                   onClick={() => setShowCustom(!showCustom)}
                   className={`py-4 rounded-2xl text-lg font-semibold transition-all duration-300 border-2 ${
@@ -147,7 +145,7 @@ export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) 
               {hasUntilNextPreset && (
                 <button
                   onClick={() => { setDuration(maxMinutes); setShowCustom(false) }}
-                  className={`py-4 rounded-2xl text-lg font-semibold transition-colors col-span-3 border-2 ${
+                  className={`py-4 rounded-2xl text-lg font-semibold transition-colors col-span-4 border-2 ${
                     !showCustom && duration === maxMinutes
                       ? isConstrained ? 'bg-transparent text-amber-400 border-amber-500' : 'bg-transparent text-blue-400 border-blue-500'
                       : isConstrained ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
