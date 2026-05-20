@@ -41,13 +41,22 @@ export default async function handler(req, res) {
     if (!/^[A-Za-z_\/]+$/.test(timeZone)) {
       return res.status(400).json({ error: 'Invalid timeZone' })
     }
+
+    // Compute start/end of "today" in the client's timezone as proper RFC3339
+    const now = new Date()
     const fmt = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
-    const todayStr = fmt.format(new Date())
+    const todayStr = fmt.format(now)
+    // Get the UTC offset for this timezone at the current moment
+    const localeStr = now.toLocaleString('en-US', { timeZone })
+    const localNow = new Date(localeStr)
+    const offsetMs = localNow.getTime() - now.getTime()
+    const startOfDayUTC = new Date(new Date(`${todayStr}T00:00:00`).getTime() - offsetMs)
+    const endOfDayUTC = new Date(new Date(`${todayStr}T23:59:59`).getTime() - offsetMs)
 
     const result = await calendar.events.list({
       calendarId,
-      timeMin: `${todayStr}T00:00:00`,
-      timeMax: `${todayStr}T23:59:59`,
+      timeMin: startOfDayUTC.toISOString(),
+      timeMax: endOfDayUTC.toISOString(),
       timeZone,
       singleEvents: true,
       orderBy: 'startTime',
