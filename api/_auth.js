@@ -1,19 +1,22 @@
 import { google } from 'googleapis'
 import { timingSafeEqual } from 'crypto'
 
-let _cachedClient = null
+let _cachedCalendarClient = null
+let _cachedMeetClient = null
 
-export async function getCalendarClient() {
-  if (_cachedClient) return _cachedClient
-
+function getCredentials() {
   const key = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
   const impersonateEmail = process.env.GOOGLE_IMPERSONATE_EMAIL
-
   if (!key) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY env var not set')
   if (!impersonateEmail) throw new Error('GOOGLE_IMPERSONATE_EMAIL env var not set')
-
   const credentials = JSON.parse(Buffer.from(key, 'base64').toString('utf-8'))
+  return { credentials, impersonateEmail }
+}
 
+export async function getCalendarClient() {
+  if (_cachedCalendarClient) return _cachedCalendarClient
+
+  const { credentials, impersonateEmail } = getCredentials()
   const auth = new google.auth.JWT({
     email: credentials.client_email,
     key: credentials.private_key,
@@ -23,8 +26,25 @@ export async function getCalendarClient() {
 
   await auth.authorize()
 
-  _cachedClient = google.calendar({ version: 'v3', auth })
-  return _cachedClient
+  _cachedCalendarClient = google.calendar({ version: 'v3', auth })
+  return _cachedCalendarClient
+}
+
+export async function getMeetClient() {
+  if (_cachedMeetClient) return _cachedMeetClient
+
+  const { credentials, impersonateEmail } = getCredentials()
+  const auth = new google.auth.JWT({
+    email: credentials.client_email,
+    key: credentials.private_key,
+    scopes: ['https://www.googleapis.com/auth/meetings.space.readonly'],
+    subject: impersonateEmail,
+  })
+
+  await auth.authorize()
+
+  _cachedMeetClient = google.meet({ version: 'v2', auth })
+  return _cachedMeetClient
 }
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean)

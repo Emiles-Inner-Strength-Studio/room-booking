@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useGoogleCalendar } from './useGoogleCalendar'
 import { useClock } from './useClock'
+import { useMeetParticipants } from './useMeetParticipants'
 import SettingsModal from './SettingsModal'
 import BookingModal from './BookingModal'
 import HelpModal from './HelpModal'
@@ -43,6 +44,20 @@ function parseRoomName(raw = '') {
   // Subtitle = everything except the last segment (room name)
   const subtitle = parts.length > 1 ? parts.slice(0, -1).join(' · ') : null
   return { displayName, subtitle, capacity }
+}
+
+function getMeetingCode(event) {
+  if (!event) return null
+  // Try conferenceData.conferenceId first
+  const confId = event.conferenceData?.conferenceId
+  if (confId && /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(confId)) return confId
+  // Fall back to parsing from entry point URIs
+  const entries = event.conferenceData?.entryPoints || []
+  for (const ep of entries) {
+    const match = ep.uri?.match(/\/([a-z]{3}-[a-z]{4}-[a-z]{3})(?:\?|$)/)
+    if (match) return match[1]
+  }
+  return null
 }
 
 function getCurrentAndNext(events, now) {
@@ -240,7 +255,11 @@ export default function App() {
   const currentEnd = effectiveCurrent && !effectiveCurrent._optimistic
     ? new Date(effectiveCurrent.end.dateTime || effectiveCurrent.end.date)
     : null
+  const currentStart = current ? new Date(current.start.dateTime || current.start.date) : null
   const timeRemaining = currentEnd ? currentEnd - now : null
+
+  const meetingCode = getMeetingCode(current)
+  const { participants } = useMeetParticipants(meetingCode, currentStart, currentEnd)
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-900 text-white overflow-hidden">
@@ -374,6 +393,27 @@ export default function App() {
                       <p className="text-slate-400 text-xl">Until {formatTime(currentEnd)}</p>
                       <p className="text-slate-500 text-base">{formatDuration(timeRemaining)} remaining</p>
                     </>
+                  )}
+                  {participants.length > 0 && (
+                    <div className="mt-4 flex items-center gap-2 flex-wrap">
+                      <div className="flex -space-x-2">
+                        {participants.slice(0, 5).map((p, i) => (
+                          <div
+                            key={i}
+                            className="w-9 h-9 rounded-full bg-slate-600 border-2 border-slate-800 flex items-center justify-center text-xs font-bold text-white"
+                            title={p.displayName}
+                          >
+                            {p.displayName.charAt(0).toUpperCase()}
+                          </div>
+                        ))}
+                      </div>
+                      <span className="text-slate-400 text-sm">
+                        {participants.length <= 5
+                          ? participants.map(p => p.displayName.split(' ')[0]).join(', ')
+                          : `${participants.slice(0, 3).map(p => p.displayName.split(' ')[0]).join(', ')} +${participants.length - 3} more`
+                        }
+                      </span>
+                    </div>
                   )}
                 </>
               )}
