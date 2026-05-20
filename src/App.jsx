@@ -5,7 +5,11 @@ import SettingsModal from './SettingsModal'
 import BookingModal from './BookingModal'
 import HelpModal from './HelpModal'
 import EventDetailModal from './EventDetailModal'
+import DatePickerModal from './DatePickerModal'
 import { MOCK_ROOM_NAME } from './mockData'
+
+const TIME_TRAVEL_TIMEOUT_MS = 30000
+const WORK_DAY_START_HOUR = 8
 
 const MIN_UPTIME_FOR_RELOAD = 5 * 60000
 const REFRESH_INTERVAL = 30000
@@ -83,13 +87,17 @@ export default function App() {
   const [lastRefresh, setLastRefresh] = useState(null)
   const [optimisticInUse, setOptimisticInUse] = useState(null)
   const [backendError, setBackendError] = useState(null)
+  const [viewDate, setViewDate] = useState(null) // null = today, 'YYYY-MM-DD' = time travel
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [timerKey, setTimerKey] = useState(0) // increment to restart outline animation
+  const timeTravelTimerRef = useRef(null)
   const refreshIntervalRef = useRef(null)
 
-  const loadEvents = useCallback(async () => {
+  const loadEvents = useCallback(async (date) => {
     if (!gcal.authed || !roomId) return
     setLoading(true)
     try {
-      const items = await gcal.getTodayEvents(roomId)
+      const items = await gcal.getEvents(roomId, date || undefined)
       setEvents(items)
       setLastRefresh(new Date())
       setBackendError(null)
@@ -98,7 +106,7 @@ export default function App() {
       setBackendError(e.message || 'Failed to load events')
     }
     setLoading(false)
-  }, [gcal.authed, roomId, gcal.getTodayEvents])
+  }, [gcal.authed, roomId, gcal.getEvents])
 
   const startRefreshCycle = useCallback((rapid = false) => {
     if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current)
@@ -129,13 +137,94 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [])
 
+  // Time travel timeout — auto-return to today after inactivity
+  const resetTimeTravelTimer = useCallback(() => {
+    if (timeTravelTimerRef.current) clearTimeout(timeTravelTimerRef.current)
+    setTimerKey(k => k + 1)
+    timeTravelTimerRef.current = setTimeout(() => {
+      setViewDate(null)
+      setShowDatePicker(false)
+    }, TIME_TRAVEL_TIMEOUT_MS)
+  }, [])
+
+  useEffect(() => {
+    if (viewDate) {
+      resetTimeTravelTimer()
+      return () => { if (timeTravelTimerRef.current) clearTimeout(timeTravelTimerRef.current) }
+    }
+  }, [viewDate, resetTimeTravelTimer])
+
+  // Reload events when viewDate changes; pause refresh cycle when time-traveling
+  useEffect(() => {
+    loadEvents(viewDate)
+    if (viewDate) {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current)
+    } else {
+      startRefreshCycle(false)
+    }
+  }, [viewDate]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isTimeTraveling = viewDate != null
+
+  const handleDateChange = (dateStr) => {
+    const todayStr = now.toLocaleDateString('en-CA')
+    if (dateStr === todayStr) {
+      setViewDate(null)
+    } else {
+      setViewDate(dateStr)
+    }
+    setShowDatePicker(false)
+  }
+
+  const returnToToday = () => {
+    setViewDate(null)
+    setShowDatePicker(false)
+    if (timeTravelTimerRef.current) clearTimeout(timeTravelTimerRef.current)
+  }
+
+  // Compute free slots for the viewed day (between events, within working hours)
+  const getFreeSlots = (dayEvents) => {
+    const dateStr = viewDate || now.toLocaleDateString('en-CA')
+    const dayStart = new Date(`${dateStr}T${String(WORK_DAY_START_HOUR).padStart(2, '0')}:00:00`)
+    const dayEnd = new Date(`${dateStr}T23:59:00`)
+
+    const sorted = dayEvents
+      .map(e => ({ start: new Date(e.start.dateTime || e.start.date), end: new Date(e.end.dateTime || e.end.date) }))
+      .sort((a, b) => a.start - b.start)
+
+    const slots = []
+    let cursor = dayStart
+
+    for (const event of sorted) {
+      if (event.start > cursor && event.start > dayStart) {
+        const slotStart = cursor < dayStart ? dayStart : cursor
+        if (event.start - slotStart >= 15 * 60000) { // min 15 min
+          slots.push({ start: slotStart, end: event.start })
+        }
+      }
+      if (event.end > cursor) cursor = event.end
+    }
+
+    // Always add a trailing slot after the last event (up to end of day)
+    if (dayEnd > cursor) {
+      const slotStart = cursor < dayStart ? dayStart : cursor
+      if (dayEnd - slotStart >= 15 * 60000) {
+        slots.push({ start: slotStart, end: dayEnd })
+      }
+    }
+
+    return slots
+  }
+
   const handleBook = async ({ title, startTime, durationMinutes }) => {
-    const until = new Date(startTime.getTime() + OPTIMISTIC_IN_USE_DURATION)
-    setOptimisticInUse({ title, until })
-    setTimeout(() => setOptimisticInUse(null), OPTIMISTIC_IN_USE_DURATION)
+    if (!viewDate) {
+      const until = new Date(startTime.getTime() + OPTIMISTIC_IN_USE_DURATION)
+      setOptimisticInUse({ title, until })
+      setTimeout(() => setOptimisticInUse(null), OPTIMISTIC_IN_USE_DURATION)
+    }
     await gcal.bookRoom(roomId, { title, startTime, durationMinutes })
-    await loadEvents()
-    startRefreshCycle(true)
+    await loadEvents(viewDate)
+    if (!viewDate) startRefreshCycle(true)
   }
 
   const { current, upcoming } = getCurrentAndNext(events, now)
@@ -243,11 +332,27 @@ export default function App() {
         <div className="flex-1 flex overflow-hidden">
 
           {/* LEFT — Availability */}
-          <div className={`w-2/3 flex flex-col p-8 border-r border-slate-800 ${isFree ? 'bg-gradient-to-b from-green-500/20 to-green-500/5' : 'bg-gradient-to-b from-red-500/20 to-red-500/5'}`}>
+          <div className={`w-2/3 flex flex-col p-8 border-r border-slate-800 ${
+            isTimeTraveling
+              ? 'bg-gradient-to-b from-blue-500/20 to-blue-500/5'
+              : isFree ? 'bg-gradient-to-b from-green-500/20 to-green-500/5' : 'bg-gradient-to-b from-red-500/20 to-red-500/5'
+          }`}>
 
             {/* Big status */}
             <div className="flex-1 flex flex-col justify-center space-y-3">
-              {isFree ? (
+              {isTimeTraveling ? (
+                <>
+                  <p className="text-blue-400 text-5xl font-extrabold tracking-tight leading-none">
+                    {new Date(viewDate + 'T12:00:00').toLocaleDateString([], { weekday: 'long' })}
+                  </p>
+                  <p className="text-slate-300 text-2xl">
+                    {new Date(viewDate + 'T12:00:00').toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </p>
+                  <p className="text-slate-500 text-lg">
+                    {events.length} meeting{events.length !== 1 ? 's' : ''} scheduled
+                  </p>
+                </>
+              ) : isFree ? (
                 <>
                   <p className="text-green-400 text-7xl font-extrabold tracking-tight leading-none">Free</p>
                   <p className="text-slate-300 text-2xl">
@@ -272,10 +377,30 @@ export default function App() {
               )}
             </div>
 
-            {/* Book Now */}
-            {isFree && (
+            {/* Book Now (today only) / Back to Today (time travel) */}
+            {isTimeTraveling ? (
               <button
-                onClick={() => setShowBooking(true)}
+                onClick={returnToToday}
+                className="relative w-full bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-6 rounded-2xl text-2xl transition-colors mt-6"
+              >
+                <svg className="absolute inset-0 w-full h-full pointer-events-none" preserveAspectRatio="none">
+                  <rect
+                    x="1" y="1" rx="16" ry="16"
+                    width="calc(100% - 2px)" height="calc(100% - 2px)"
+                    fill="none" stroke="currentColor" strokeWidth="2"
+                    className="text-blue-400"
+                    pathLength="1"
+                    strokeDasharray="1"
+                    strokeDashoffset="0"
+                    key={timerKey}
+                    style={{ animation: `timer-outline ${TIME_TRAVEL_TIMEOUT_MS / 1000}s linear forwards` }}
+                  />
+                </svg>
+                <span className="relative">Back to Today</span>
+              </button>
+            ) : isFree && (
+              <button
+                onClick={() => setShowBooking({ startTime: now, maxEnd: nextStart })}
                 className="w-full bg-green-500 hover:bg-green-400 active:bg-green-600 text-white font-bold py-6 rounded-2xl text-2xl transition-colors shadow-xl mt-6"
               >
                 Book Now
@@ -286,45 +411,125 @@ export default function App() {
           {/* RIGHT — Schedule */}
           <div className="w-1/3 flex flex-col overflow-hidden">
             <div className="px-8 pt-7 pb-3">
-              <h2 className="text-slate-500 text-xs font-semibold uppercase tracking-widest">Today's Schedule</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-slate-500 text-xs font-semibold uppercase tracking-widest">
+                  {isTimeTraveling
+                    ? new Date(viewDate + 'T12:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
+                    : "Today's Schedule"
+                  }
+                </h2>
+                <button
+                  onClick={() => { setShowDatePicker(true); if (isTimeTraveling) resetTimeTravelTimer() }}
+                  className={`text-slate-500 hover:text-slate-300 transition-colors p-1 ${isTimeTraveling ? 'text-blue-400' : ''}`}
+                  title="View another day"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                  </svg>
+                </button>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-6 pb-4">
+            <div className="flex-1 overflow-y-auto px-6 pb-4" onClick={() => { if (isTimeTraveling) resetTimeTravelTimer() }}>
               {loading && events.length === 0 ? (
                 <div className="text-slate-500 text-base text-center py-10">Loading...</div>
-              ) : events.length === 0 ? (
+              ) : events.length === 0 && !isTimeTraveling ? (
                 <div className="text-slate-500 text-base text-center py-10">
-                  {roomId ? 'No meetings today' : 'Select a room in Settings ⚙️'}
+                  {roomId ? 'No meetings today' : 'Select a room in Settings'}
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {events.map(event => {
-                    const start = new Date(event.start.dateTime || event.start.date)
-                    const end = new Date(event.end.dateTime || event.end.date)
-                    const isPast = end < now
-                    const isNow = start <= now && end > now
-                    return (
-                      <div
-                        key={event.id}
-                        onClick={() => setSelectedEvent(event)}
-                        className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all cursor-pointer ${
-                          isNow ? 'bg-red-500/10 border-red-500/30 sticky top-0 z-10 shadow-lg backdrop-blur-md'
-                          : isPast ? 'bg-slate-800/20 border-slate-700/20 opacity-35'
-                          : 'bg-slate-800/50 border-slate-700/30 hover:bg-slate-800/70'
-                        }`}
-                      >
-                        <div className="text-right min-w-[4.5rem]">
-                          <div className={`text-sm font-semibold ${isNow ? 'text-red-300' : 'text-slate-300'}`}>{formatTime(start)}</div>
-                          <div className="text-xs text-slate-500">{formatTime(end)}</div>
+                  {(() => {
+                    if (!isTimeTraveling) {
+                      // Today: just show events
+                      return events.map(event => {
+                        const start = new Date(event.start.dateTime || event.start.date)
+                        const end = new Date(event.end.dateTime || event.end.date)
+                        const isPast = end < now
+                        const isNow = start <= now && end > now
+                        return (
+                          <div
+                            key={event.id}
+                            onClick={() => setSelectedEvent(event)}
+                            className={`flex items-center gap-4 px-5 py-4 rounded-2xl border transition-all cursor-pointer ${
+                              isNow ? 'bg-red-500/10 border-red-500/30 sticky top-0 z-10 shadow-lg backdrop-blur-md'
+                              : isPast ? 'bg-slate-800/20 border-slate-700/20 opacity-35'
+                              : 'bg-slate-800/50 border-slate-700/30 hover:bg-slate-800/70'
+                            }`}
+                          >
+                            <div className="text-right min-w-[4.5rem]">
+                              <div className={`text-sm font-semibold ${isNow ? 'text-red-300' : 'text-slate-300'}`}>{formatTime(start)}</div>
+                              <div className="text-xs text-slate-500">{formatTime(end)}</div>
+                            </div>
+                            <div className={`w-0.5 h-10 rounded-full flex-shrink-0 ${isNow ? 'bg-red-500' : 'bg-slate-600'}`} />
+                            <div className="flex-1 min-w-0">
+                              <div className={`text-base font-medium truncate ${isNow ? 'text-white' : 'text-slate-200'}`}>{event.summary || 'Private event'}</div>
+                              <div className="text-xs text-slate-500 mt-0.5">{formatDuration(end - start)}</div>
+                            </div>
+                            {isNow && <div className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />}
+                          </div>
+                        )
+                      })
+                    }
+
+                    // Time travel: interleave events and free slots
+                    const freeSlots = getFreeSlots(events)
+                    const allItems = [
+                      ...events.map(e => ({ type: 'event', data: e, sortTime: new Date(e.start.dateTime || e.start.date) })),
+                      ...freeSlots.map(s => ({ type: 'free', data: s, sortTime: s.start })),
+                    ].sort((a, b) => a.sortTime - b.sortTime)
+
+                    if (allItems.length === 0) {
+                      return <div className="text-slate-500 text-base text-center py-10">No meetings — fully available</div>
+                    }
+
+                    return allItems.map((item, i) => {
+                      if (item.type === 'event') {
+                        const event = item.data
+                        const start = new Date(event.start.dateTime || event.start.date)
+                        const end = new Date(event.end.dateTime || event.end.date)
+                        return (
+                          <div
+                            key={event.id}
+                            onClick={() => setSelectedEvent(event)}
+                            className="flex items-center gap-4 px-5 py-4 rounded-2xl border bg-slate-800/50 border-slate-700/30 hover:bg-slate-800/70 transition-all cursor-pointer"
+                          >
+                            <div className="text-right min-w-[4.5rem]">
+                              <div className="text-sm font-semibold text-slate-300">{formatTime(start)}</div>
+                              <div className="text-xs text-slate-500">{formatTime(end)}</div>
+                            </div>
+                            <div className="w-0.5 h-10 rounded-full flex-shrink-0 bg-slate-600" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-base font-medium truncate text-slate-200">{event.summary || 'Private event'}</div>
+                              <div className="text-xs text-slate-500 mt-0.5">{formatDuration(end - start)}</div>
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      // Free slot — tappable
+                      const slot = item.data
+                      return (
+                        <div
+                          key={`free-${i}`}
+                          onClick={() => {
+                            resetTimeTravelTimer()
+                            setShowBooking({ startTime: slot.start, maxEnd: slot.end })
+                          }}
+                          className="flex items-center gap-4 px-5 py-4 rounded-2xl border border-dashed border-green-500/40 bg-green-500/5 hover:bg-green-500/15 transition-all cursor-pointer"
+                        >
+                          <div className="text-right min-w-[4.5rem]">
+                            <div className="text-sm font-semibold text-green-400">{formatTime(slot.start)}</div>
+                            <div className="text-xs text-green-500/70">{formatTime(slot.end)}</div>
+                          </div>
+                          <div className="w-0.5 h-10 rounded-full flex-shrink-0 bg-green-500/40" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-base font-medium text-green-400">Available</div>
+                            <div className="text-xs text-green-500/70">{formatDuration(slot.end - slot.start)} free — tap to book</div>
+                          </div>
                         </div>
-                        <div className={`w-0.5 h-10 rounded-full flex-shrink-0 ${isNow ? 'bg-red-500' : 'bg-slate-600'}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-base font-medium truncate ${isNow ? 'text-white' : 'text-slate-200'}`}>{event.summary || 'Private event'}</div>
-                          <div className="text-xs text-slate-500 mt-0.5">{formatDuration(end - start)}</div>
-                        </div>
-                        {isNow && <div className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />}
-                      </div>
-                    )
-                  })}
+                      )
+                    })
+                  })()}
                 </div>
               )}
             </div>
@@ -349,10 +554,23 @@ export default function App() {
         <SettingsModal gcal={gcal} onClose={() => setShowSettings(false)} onSave={(id, name) => { setRoomId(id); setRoomName(name) }} onRefresh={loadEvents} />
       )}
       {showBooking && (
-        <BookingModal startTime={now} maxEnd={nextStart} onClose={() => setShowBooking(false)} onConfirm={handleBook} />
+        <BookingModal
+          startTime={showBooking.startTime || now}
+          maxEnd={showBooking.maxEnd || nextStart}
+          onClose={() => setShowBooking(false)}
+          onConfirm={handleBook}
+        />
       )}
       {showHelp && (
         <HelpModal roomName={roomName} onClose={() => setShowHelp(false)} />
+      )}
+      {showDatePicker && (
+        <DatePickerModal
+          today={now}
+          selectedDate={viewDate}
+          onClose={() => setShowDatePicker(false)}
+          onSelect={(dateStr) => { handleDateChange(dateStr); resetTimeTravelTimer() }}
+        />
       )}
       {selectedEvent && (
         <EventDetailModal

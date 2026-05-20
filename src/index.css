@@ -9,3 +9,8 @@ body {
   overflow: hidden;
   background: #0f172a;
 }
+
+@keyframes timer-outline {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 1; }
+}

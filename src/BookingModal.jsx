@@ -16,7 +16,11 @@ function formatDurationLabel(mins) {
   return m > 0 ? `${h}h ${m}m` : `${h}h`
 }
 
-export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) {
+export default function BookingModal({ onClose, onConfirm, startTime: initialStartTime, maxEnd }) {
+  const [editedStartTime, setEditedStartTime] = useState(initialStartTime)
+  const [editingStart, setEditingStart] = useState(false)
+
+  const startTime = editedStartTime
   const maxMinutes = maxEnd ? Math.floor((maxEnd - startTime) / 60000) : null
 
   const DEFAULT_DURATION = 30
@@ -33,6 +37,7 @@ export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const customInputRef = useRef(null)
+  const timeInputRef = useRef(null)
 
   useEffect(() => {
     if (showCustom) {
@@ -40,6 +45,26 @@ export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) 
       return () => clearTimeout(timer)
     }
   }, [showCustom])
+
+  useEffect(() => {
+    if (editingStart) {
+      const timer = setTimeout(() => timeInputRef.current?.focus(), 50)
+      return () => clearTimeout(timer)
+    }
+  }, [editingStart])
+
+  const commitTimeChange = (value) => {
+    if (!value || !value.includes(':')) return
+    const [hours, minutes] = value.split(':').map(Number)
+    if (isNaN(hours) || isNaN(minutes)) return
+    const newStart = new Date(startTime)
+    newStart.setHours(hours, minutes, 0, 0)
+    // Don't allow setting before the original start or after maxEnd
+    if (maxEnd && newStart >= maxEnd) return
+    if (newStart < initialStartTime) return
+    setEditedStartTime(newStart)
+    setEditingStart(false)
+  }
 
   const effectiveDuration = showCustom
     ? Math.min(parseInt(customMinutes) || 0, maxMinutes ?? Infinity)
@@ -71,8 +96,25 @@ export default function BookingModal({ onClose, onConfirm, startTime, maxEnd }) 
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-white text-3xl font-bold">Book This Room</h2>
-              <p className="text-slate-400 text-base mt-1">
-                {fmt(startTime)} → {fmt(endTime)} · {effectiveDuration}m
+              <p className="text-slate-400 text-base mt-1 flex items-center gap-1">
+                {editingStart ? (
+                  <input
+                    ref={timeInputRef}
+                    type="time"
+                    defaultValue={`${String(startTime.getHours()).padStart(2, '0')}:${String(startTime.getMinutes()).padStart(2, '0')}`}
+                    onBlur={(e) => { commitTimeChange(e.target.value); setEditingStart(false) }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { commitTimeChange(e.target.value); setEditingStart(false) } }}
+                    className="bg-slate-700 text-blue-400 rounded-lg px-2 py-0.5 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 w-24"
+                  />
+                ) : (
+                  <button
+                    onClick={() => setEditingStart(true)}
+                    className="text-blue-400 hover:text-blue-300 font-semibold underline underline-offset-2 decoration-blue-400/40 transition-colors"
+                  >
+                    {fmt(startTime)}
+                  </button>
+                )}
+                <span> → {fmt(endTime)} · {effectiveDuration}m</span>
               </p>
             </div>
             <button onClick={onClose} className="text-slate-500 hover:text-white text-3xl leading-none w-10 h-10 flex items-center justify-center">×</button>

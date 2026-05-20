@@ -42,16 +42,26 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid timeZone' })
     }
 
-    // Compute start/end of "today" in the client's timezone as proper RFC3339
-    const now = new Date()
-    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
-    const todayStr = fmt.format(now)
-    // Get the UTC offset for this timezone at the current moment
-    const localeStr = now.toLocaleString('en-US', { timeZone })
-    const localNow = new Date(localeStr)
-    const offsetMs = localNow.getTime() - now.getTime()
-    const startOfDayUTC = new Date(new Date(`${todayStr}T00:00:00`).getTime() - offsetMs)
-    const endOfDayUTC = new Date(new Date(`${todayStr}T23:59:59`).getTime() - offsetMs)
+    // Optional date param (YYYY-MM-DD), defaults to today in client timezone
+    const dateParam = req.query.date
+    let dayStr
+    if (dateParam) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+        return res.status(400).json({ error: 'Invalid date format, use YYYY-MM-DD' })
+      }
+      dayStr = dateParam
+    } else {
+      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' })
+      dayStr = fmt.format(new Date())
+    }
+
+    // Compute start/end of the target day as proper RFC3339 in UTC
+    const refDate = new Date(`${dayStr}T12:00:00Z`) // midday to avoid DST edge cases
+    const localeStr = refDate.toLocaleString('en-US', { timeZone })
+    const localRef = new Date(localeStr)
+    const offsetMs = localRef.getTime() - refDate.getTime()
+    const startOfDayUTC = new Date(new Date(`${dayStr}T00:00:00`).getTime() - offsetMs)
+    const endOfDayUTC = new Date(new Date(`${dayStr}T23:59:59`).getTime() - offsetMs)
 
     const result = await calendar.events.list({
       calendarId,

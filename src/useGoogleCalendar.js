@@ -69,11 +69,11 @@ async function backendListRooms() {
   return res.json()
 }
 
-async function backendGetTodayEvents(calendarId) {
+async function backendGetEvents(calendarId, date) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-  const res = await fetch(`/api/events?calendarId=${encodeURIComponent(calendarId)}&timeZone=${encodeURIComponent(tz)}`, {
-    headers: getApiKeyHeader(),
-  })
+  let url = `/api/events?calendarId=${encodeURIComponent(calendarId)}&timeZone=${encodeURIComponent(tz)}`
+  if (date) url += `&date=${encodeURIComponent(date)}`
+  const res = await fetch(url, { headers: getApiKeyHeader() })
   if (!res.ok) throw new Error(`events: ${res.status}`)
   return res.json()
 }
@@ -246,12 +246,12 @@ export function useGoogleCalendar() {
     return res.result.items || []
   }, [isMock, isBackend])
 
-  const getTodayEvents = useCallback(async (calendarId) => {
+  const getEvents = useCallback(async (calendarId, date) => {
     if (isMock) return getMockEvents()
-    if (isBackend) return backendGetTodayEvents(calendarId)
-    const now = new Date()
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
-    const endOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+    if (isBackend) return backendGetEvents(calendarId, date)
+    const target = date ? new Date(`${date}T00:00:00`) : new Date()
+    const startOfDay = new Date(target.getFullYear(), target.getMonth(), target.getDate(), 0, 0, 0)
+    const endOfDay   = new Date(target.getFullYear(), target.getMonth(), target.getDate(), 23, 59, 59)
     const res = await window.gapi.client.calendar.events.list({
       calendarId,
       timeMin: startOfDay.toISOString(),
@@ -303,5 +303,5 @@ export function useGoogleCalendar() {
     await window.gapi.client.calendar.events.delete({ calendarId, eventId })
   }, [isMock, isBackend])
 
-  return { ready, authed, needsReconnect, error, isMock, isBackend, signIn, signOut, listRooms, getTodayEvents, bookRoom, deleteEvent }
+  return { ready, authed, needsReconnect, error, isMock, isBackend, signIn, signOut, listRooms, getEvents, bookRoom, deleteEvent }
 }
