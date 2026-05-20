@@ -6,6 +6,7 @@ import BookingModal from './BookingModal'
 import HelpModal from './HelpModal'
 import EventDetailModal from './EventDetailModal'
 import DatePickerModal from './DatePickerModal'
+import FreeRoomModal from './FreeRoomModal'
 import { MOCK_ROOM_NAME } from './mockData'
 
 const TIME_TRAVEL_TIMEOUT_MS = 30000
@@ -83,6 +84,7 @@ export default function App() {
   const [showBooking, setShowBooking] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState(null)
+  const [showFreeRooms, setShowFreeRooms] = useState(false)
   const [loading, setLoading] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(null)
   const [optimisticInUse, setOptimisticInUse] = useState(null)
@@ -398,12 +400,19 @@ export default function App() {
                 </svg>
                 <span className="relative">Back to Today</span>
               </button>
-            ) : isFree && (
+            ) : isFree ? (
               <button
                 onClick={() => setShowBooking({ startTime: now, maxEnd: nextStart })}
                 className="w-full bg-green-500 hover:bg-green-400 active:bg-green-600 text-white font-bold py-6 rounded-2xl text-2xl transition-colors shadow-xl mt-6"
               >
                 Book Now
+              </button>
+            ) : !effectiveCurrent?._optimistic && (
+              <button
+                onClick={() => setShowFreeRooms(true)}
+                className="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold py-6 rounded-2xl text-2xl transition-colors mt-6"
+              >
+                Find a Free Room
               </button>
             )}
           </div>
@@ -570,6 +579,14 @@ export default function App() {
           selectedDate={viewDate}
           onClose={() => setShowDatePicker(false)}
           onSelect={(dateStr) => { handleDateChange(dateStr); resetTimeTravelTimer() }}
+        />
+      )}
+      {showFreeRooms && (
+        <FreeRoomModal
+          onClose={() => setShowFreeRooms(false)}
+          gcal={gcal}
+          currentRoomId={roomId}
+          currentRoomName={roomName}
         />
       )}
       {selectedEvent && (
