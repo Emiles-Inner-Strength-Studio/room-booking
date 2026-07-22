@@ -12,6 +12,7 @@ export const SCREEN_OFF_TIMEOUT_MS = 10 * 60 * 1000
 export const SCREEN_DIM_OPACITY = 0.6
 export const SCREEN_OFF_START_HOUR = 18
 export const SCREEN_OFF_END_HOUR = 7
+export const DEPLOYMENT_VERSION_POLL_INTERVAL_MS = 15 * 1000
 
 // ── Meet participants polling ──
 

@@ -50,3 +50,16 @@ In Google Workspace Admin or Calendar:
 - React + Vite
 - Tailwind CSS v4
 - Google Calendar API (browser-side OAuth via GIS)
+
+## Remotely refresh every display
+
+Only a Vercel team member can trigger a fleet-wide refresh:
+
+1. Open the `room-booking` project in Vercel.
+2. Open **Deployments** and select the current Production deployment.
+3. Choose **Redeploy**, then confirm **Redeploy**.
+4. Wait for the new deployment to become Ready.
+
+Every open kiosk checks the opaque Vercel deployment version and reloads within
+about 15 seconds. Kiosks have no endpoint or credential capable of triggering a
+fleet-wide refresh.

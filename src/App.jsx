@@ -3,6 +3,7 @@ import { useGoogleCalendar } from './useGoogleCalendar'
 import { useClock } from './useClock'
 import { useMeetParticipants } from './useMeetParticipants'
 import { useIdleScreen } from './useIdleScreen'
+import { useDeploymentRefresh } from './useDeploymentRefresh'
 import { getEventDisplayTitle, isPrivateEvent } from './eventPrivacy'
 import SettingsModal from './SettingsModal'
 import BookingModal from './BookingModal'
@@ -96,6 +97,7 @@ export default function App() {
   const gcal = useGoogleCalendar()
   const now = useClock()
   const { screenState, wake } = useIdleScreen()
+  useDeploymentRefresh()
   const [events, setEvents] = useState([])
   const [roomId, setRoomId] = useState(localStorage.getItem('gcal_room_id') || '')
   const [roomName, setRoomName] = useState(localStorage.getItem('gcal_room_name') || MOCK_ROOM_NAME)
