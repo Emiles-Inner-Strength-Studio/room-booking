@@ -7,6 +7,11 @@ export const POST_BOOK_RAPID_INTERVAL = 1000
 export const POST_BOOK_RAPID_DURATION = 15000
 export const OPTIMISTIC_IN_USE_DURATION = 15000
 export const MIN_UPTIME_FOR_RELOAD = 5 * 60000
+export const SCREEN_DIM_TIMEOUT_MS = 10 * 60 * 1000
+export const SCREEN_OFF_TIMEOUT_MS = 10 * 60 * 1000
+export const SCREEN_DIM_OPACITY = 0.6
+export const SCREEN_OFF_START_HOUR = 18
+export const SCREEN_OFF_END_HOUR = 7
 
 // ── Meet participants polling ──
 

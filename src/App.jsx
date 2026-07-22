@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useGoogleCalendar } from './useGoogleCalendar'
 import { useClock } from './useClock'
 import { useMeetParticipants } from './useMeetParticipants'
+import { useIdleScreen } from './useIdleScreen'
 import SettingsModal from './SettingsModal'
 import BookingModal from './BookingModal'
 import HelpModal from './HelpModal'
@@ -17,6 +18,7 @@ import {
   POST_BOOK_RAPID_INTERVAL,
   POST_BOOK_RAPID_DURATION,
   OPTIMISTIC_IN_USE_DURATION,
+  SCREEN_DIM_OPACITY,
 } from './config'
 
 function formatTime(date) {
@@ -92,6 +94,7 @@ function HelpIcon() {
 export default function App() {
   const gcal = useGoogleCalendar()
   const now = useClock()
+  const { screenState, wake } = useIdleScreen()
   const [events, setEvents] = useState([])
   const [roomId, setRoomId] = useState(localStorage.getItem('gcal_room_id') || '')
   const [roomName, setRoomName] = useState(localStorage.getItem('gcal_room_name') || MOCK_ROOM_NAME)
@@ -263,6 +266,32 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-900 text-white overflow-hidden">
+
+      {/* Browser kiosk display sleep layer. It catches the first tap so waking
+          the display does not accidentally activate a control underneath. */}
+      <div
+        className="fixed inset-0 bg-black"
+        style={{
+          zIndex: 10000,
+          opacity: screenState === 'off' ? 1 : screenState === 'dimmed' ? SCREEN_DIM_OPACITY : 0,
+          pointerEvents: screenState === 'active' ? 'none' : 'auto',
+          transition: screenState === 'active' ? 'none' : 'opacity 300ms ease',
+        }}
+        role={screenState === 'active' ? undefined : 'button'}
+        aria-label={screenState === 'active' ? undefined : 'Wake screen'}
+        aria-hidden={screenState === 'active' ? 'true' : undefined}
+        tabIndex={screenState === 'active' ? -1 : 0}
+        onPointerDown={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          wake()
+        }}
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          wake()
+        }}
+      />
 
       {/* Header */}
       <div className="flex items-center justify-between px-8 pt-7 pb-4 border-b border-slate-800">
