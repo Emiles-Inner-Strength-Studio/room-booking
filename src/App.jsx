@@ -3,6 +3,7 @@ import { useGoogleCalendar } from './useGoogleCalendar'
 import { useClock } from './useClock'
 import { useMeetParticipants } from './useMeetParticipants'
 import { useIdleScreen } from './useIdleScreen'
+import { getEventDisplayTitle, isPrivateEvent } from './eventPrivacy'
 import SettingsModal from './SettingsModal'
 import BookingModal from './BookingModal'
 import HelpModal from './HelpModal'
@@ -261,8 +262,16 @@ export default function App() {
   const currentStart = current ? new Date(current.start.dateTime || current.start.date) : null
   const timeRemaining = currentEnd ? currentEnd - now : null
 
-  const meetingCode = getMeetingCode(current)
-  const { participants } = useMeetParticipants(meetingCode, currentStart, currentEnd, gcal.isBackend)
+  const currentIsPrivate = isPrivateEvent(current)
+  const meetingCode = currentIsPrivate ? null : getMeetingCode(current)
+  const { participants } = useMeetParticipants(
+    meetingCode,
+    currentStart,
+    currentEnd,
+    gcal.isBackend,
+    roomId,
+    current?.id,
+  )
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-900 text-white overflow-hidden">
@@ -441,7 +450,7 @@ export default function App() {
                 </>
               ) : (
                 <>
-                  <p className="text-white text-6xl font-bold leading-tight">{effectiveCurrent.summary || 'Private event'}</p>
+                  <p className="text-white text-6xl font-bold leading-tight">{getEventDisplayTitle(effectiveCurrent)}</p>
                   {effectiveCurrent._optimistic ? (
                     <p className="text-slate-400 text-xl">Just booked</p>
                   ) : (
@@ -578,7 +587,7 @@ export default function App() {
                             </div>
                             <div className={`w-0.5 h-10 rounded-full flex-shrink-0 ${isNow ? 'bg-red-500' : 'bg-slate-600'}`} />
                             <div className="flex-1 min-w-0">
-                              <div className={`text-base font-medium truncate ${isNow ? 'text-white' : 'text-slate-200'}`}>{event.summary || 'Private event'}</div>
+                              <div className={`text-base font-medium truncate ${isNow ? 'text-white' : 'text-slate-200'}`}>{getEventDisplayTitle(event)}</div>
                               <div className="text-xs text-slate-500 mt-0.5">{formatDuration(end - start)}</div>
                             </div>
                             {isNow && <div className="w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse flex-shrink-0" />}
@@ -615,7 +624,7 @@ export default function App() {
                             </div>
                             <div className="w-0.5 h-10 rounded-full flex-shrink-0 bg-slate-600" />
                             <div className="flex-1 min-w-0">
-                              <div className="text-base font-medium truncate text-slate-200">{event.summary || 'Private event'}</div>
+                              <div className="text-base font-medium truncate text-slate-200">{getEventDisplayTitle(event)}</div>
                               <div className="text-xs text-slate-500 mt-0.5">{formatDuration(end - start)}</div>
                             </div>
                           </div>

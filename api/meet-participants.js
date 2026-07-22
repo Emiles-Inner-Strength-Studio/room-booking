@@ -1,24 +1,51 @@
-import { getMeetClient, cors, securityHeaders, rateLimit, requireAuth } from './_auth.js'
+import { getCalendarClient, getMeetClient, cors, securityHeaders, rateLimit, requireAuth } from './_auth.js'
+import { isPrivateEvent } from '../src/eventPrivacy.js'
+
+function getMeetingCode(event) {
+  const values = [
+    event.conferenceData?.conferenceId,
+    event.hangoutLink,
+    ...(event.conferenceData?.entryPoints || []).map(entry => entry.uri),
+  ]
+  return values.join(' ').match(/[a-z]{3}-[a-z]{4}-[a-z]{3}/)?.[0] || null
+}
 
 export default async function handler(req, res) {
   securityHeaders(res)
   cors(req, res)
+  res.setHeader('Cache-Control', 'no-store, max-age=0')
+  res.setHeader('CDN-Cache-Control', 'no-store')
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (!rateLimit(req, res)) return
   if (!requireAuth(req, res)) return
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { meetingCode } = req.query
-  if (!meetingCode || typeof meetingCode !== 'string') {
-    return res.status(400).json({ error: 'meetingCode required' })
+  const { calendarId, eventId } = req.query
+  if (!calendarId || typeof calendarId !== 'string' || calendarId.length > 256) {
+    return res.status(400).json({ error: 'Valid calendarId required' })
   }
-  // Meeting codes are like "abc-mnop-xyz"
-  if (!/^[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(meetingCode)) {
-    return res.status(400).json({ error: 'Invalid meetingCode format' })
+  if (!eventId || typeof eventId !== 'string' || eventId.length > 1024) {
+    return res.status(400).json({ error: 'Valid eventId required' })
   }
 
   try {
-    const meet = await getMeetClient()
+    // Reload the event server-side so a client cannot bypass its privacy flag.
+    const calendar = await getCalendarClient()
+    const event = (await calendar.events.get({ calendarId, eventId })).data
+    if (isPrivateEvent(event)) {
+      return res.status(200).json({ participants: [] })
+    }
+
+    const meetingCode = getMeetingCode(event)
+    const organizerEmail = event.organizer?.email
+    if (!meetingCode || !organizerEmail) {
+      return res.status(200).json({ participants: [] })
+    }
+
+    // Meet records are visible to the conference organizer. Room kiosks
+    // normally impersonate a fixed admin account, which cannot see meetings
+    // organized by other users, so use the organizer from the Calendar event.
+    const meet = await getMeetClient(organizerEmail)
 
     // Find active conference for this meeting code
     const confRes = await meet.conferenceRecords.list({
@@ -45,11 +72,12 @@ export default async function handler(req, res) {
 
     res.status(200).json({ participants })
   } catch (e) {
-    // 404 = meeting not found, 403 = scope not configured yet — not fatal
-    if (e.code === 404 || e.status === 404 || e.code === 403 || e.status === 403) {
+    // A missing/not-yet-started meeting is a valid empty result.
+    if (e.code === 404 || e.status === 404) {
       return res.status(200).json({ participants: [] })
     }
     console.error('meet-participants error:', e.message)
-    res.status(500).json({ error: e.message || 'Failed to fetch participants' })
+    const status = e.code === 403 || e.status === 403 ? 403 : 500
+    res.status(status).json({ error: status === 403 ? 'Meet access denied' : 'Failed to fetch participants' })
   }
 }

@@ -3,7 +3,7 @@ import { timingSafeEqual } from 'crypto'
 import { RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX } from './_config.js'
 
 let _cachedCalendarClient = null
-let _cachedMeetClient = null
+const _cachedMeetClients = new Map()
 
 function getCredentials() {
   const key = process.env.GOOGLE_SERVICE_ACCOUNT_KEY
@@ -31,21 +31,33 @@ export async function getCalendarClient() {
   return _cachedCalendarClient
 }
 
-export async function getMeetClient() {
-  if (_cachedMeetClient) return _cachedMeetClient
-
+export async function getMeetClient(subject) {
   const { credentials, impersonateEmail } = getCredentials()
+  const meetSubject = (subject || impersonateEmail).trim().toLowerCase()
+  const allowedDomain = impersonateEmail.split('@')[1]?.toLowerCase()
+
+  // The API-key-protected endpoint may select the meeting organizer, but it
+  // must never turn domain-wide delegation into arbitrary-domain impersonation.
+  if (!allowedDomain || meetSubject.split('@')[1] !== allowedDomain) {
+    const error = new Error('Meeting organizer is outside the configured Workspace domain')
+    error.status = 403
+    throw error
+  }
+
+  if (_cachedMeetClients.has(meetSubject)) return _cachedMeetClients.get(meetSubject)
+
   const auth = new google.auth.JWT({
     email: credentials.client_email,
     key: credentials.private_key,
     scopes: ['https://www.googleapis.com/auth/meetings.space.readonly'],
-    subject: impersonateEmail,
+    subject: meetSubject,
   })
 
   await auth.authorize()
 
-  _cachedMeetClient = google.meet({ version: 'v2', auth })
-  return _cachedMeetClient
+  const client = google.meet({ version: 'v2', auth })
+  _cachedMeetClients.set(meetSubject, client)
+  return client
 }
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean)

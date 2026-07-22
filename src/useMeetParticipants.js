@@ -9,11 +9,14 @@ const getApiKeyHeader = () => {
 }
 
 // Backend mode: call our serverless endpoint
-async function fetchParticipantsBackend(meetingCode) {
-  const res = await fetch(`/api/meet-participants?meetingCode=${encodeURIComponent(meetingCode)}`, {
+async function fetchParticipantsBackend(calendarId, eventId) {
+  const params = new URLSearchParams({ calendarId, eventId })
+
+  const res = await fetch(`/api/meet-participants?${params}`, {
     headers: getApiKeyHeader(),
+    cache: 'no-store',
   })
-  if (!res.ok) return []
+  if (!res.ok) throw new Error(`Meet participants request failed (${res.status})`)
   const data = await res.json()
   return data.participants || []
 }
@@ -60,36 +63,36 @@ async function fetchParticipantsOAuth(meetingCode) {
  * - Stops when eventEnd is reached or meetingCode is null
  * - Works in both backend (service account) and OAuth (client-side) modes
  */
-export function useMeetParticipants(meetingCode, eventStart, eventEnd, isBackend = true) {
-  const [participants, setParticipants] = useState([])
+export function useMeetParticipants(meetingCode, eventStart, eventEnd, isBackend = true, calendarId = null, eventId = null) {
+  const [participantState, setParticipantState] = useState({ meetingCode: null, participants: [] })
   const intervalRef = useRef(null)
   const timeoutRef = useRef(null)
   const phaseTimeoutRef = useRef(null)
+  const startMs = eventStart?.getTime() ?? null
+  const endMs = eventEnd?.getTime() ?? null
 
   useEffect(() => {
-    if (!meetingCode || !eventStart || !eventEnd) {
-      setParticipants([])
-      return
-    }
+    if (!meetingCode || startMs == null || endMs == null) return
+    if (isBackend && (!calendarId || !eventId)) return
 
     const now = Date.now()
-    const startMs = eventStart.getTime()
-    const endMs = eventEnd.getTime()
 
     // If event already ended, don't poll
-    if (now >= endMs) {
-      setParticipants([])
-      return
-    }
+    if (now >= endMs) return
 
     let active = true
 
     const poll = async () => {
       if (!active) return
-      const result = isBackend
-        ? await fetchParticipantsBackend(meetingCode)
-        : await fetchParticipantsOAuth(meetingCode)
-      if (active) setParticipants(result)
+      try {
+        const result = isBackend
+          ? await fetchParticipantsBackend(calendarId, eventId)
+          : await fetchParticipantsOAuth(meetingCode)
+        if (active) setParticipantState({ meetingCode, participants: result })
+      } catch (error) {
+        // Keep the last known participant list during transient failures.
+        console.warn('[meet] participant polling failed:', error.message)
+      }
     }
 
     const startPolling = () => {
@@ -127,7 +130,7 @@ export function useMeetParticipants(meetingCode, eventStart, eventEnd, isBackend
     const stopMs = endMs - Date.now()
     const stopTimer = setTimeout(() => {
       active = false
-      setParticipants([])
+      setParticipantState({ meetingCode, participants: [] })
       clearInterval(intervalRef.current)
     }, stopMs)
 
@@ -138,7 +141,10 @@ export function useMeetParticipants(meetingCode, eventStart, eventEnd, isBackend
       clearTimeout(phaseTimeoutRef.current)
       clearTimeout(stopTimer)
     }
-  }, [meetingCode, eventStart?.getTime(), eventEnd?.getTime(), isBackend])
+  }, [meetingCode, startMs, endMs, isBackend, calendarId, eventId])
 
+  const participants = participantState.meetingCode === meetingCode
+    ? participantState.participants
+    : []
   return { participants }
 }

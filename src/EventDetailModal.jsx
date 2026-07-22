@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAutoClose } from './useAutoClose'
 import QrModal from './QrModal'
 import TimerCloseButton from './TimerCloseButton'
+import { getEventDisplayTitle, isPrivateEvent } from './eventPrivacy'
 
 export default function EventDetailModal({ event, onClose, onCancel }) {
   const start = new Date(event.start.dateTime || event.start.date)
@@ -15,9 +16,10 @@ export default function EventDetailModal({ event, onClose, onCancel }) {
       ? `${totalMins / 60}h`
       : `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`
 
-  const organizer = event.organizer
-  const attendees = (event.attendees || []).filter(a => !a.resource && !a.self)
-  const isInstantMeeting = event.summary === 'Instant Meeting'
+  const isPrivate = isPrivateEvent(event)
+  const organizer = isPrivate ? null : event.organizer
+  const attendees = isPrivate ? [] : (event.attendees || []).filter(a => !a.resource && !a.self)
+  const isInstantMeeting = !isPrivate && event.summary === 'Instant Meeting'
   const [showQr, setShowQr] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelled, setCancelled] = useState(false)
@@ -38,7 +40,7 @@ export default function EventDetailModal({ event, onClose, onCancel }) {
           <div className="px-8 pt-8 pb-6 border-b border-slate-700">
             <div className="flex justify-between items-start">
               <div className="min-w-0 flex-1">
-                <h2 className="text-white text-3xl font-bold truncate">{event.summary}</h2>
+                <h2 className="text-white text-3xl font-bold truncate">{getEventDisplayTitle(event)}</h2>
                 <p className="text-slate-400 text-base mt-1">
                   {fmt(start)} → {fmt(end)} · {durationLabel}
                 </p>
@@ -99,7 +101,9 @@ export default function EventDetailModal({ event, onClose, onCancel }) {
             )}
 
             {!organizer && attendees.length === 0 && (
-              <p className="text-slate-500 text-base text-center py-4">No participant info available</p>
+              <p className="text-slate-500 text-base text-center py-4">
+                {isPrivate ? 'Meeting details are private' : 'No participant info available'}
+              </p>
             )}
           </div>
 
